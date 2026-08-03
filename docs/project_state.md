@@ -29,6 +29,7 @@
 - [x] Proyecto Vercel creado (`borb-a59f/borb-financial-os`) y conectado al repo de GitHub (rama `main` = producción, deploys automáticos en cada push).
 - [x] Env vars de Supabase cargadas en Vercel (production/preview/development).
 - [x] **Deploy inicial verificado en producción:** https://borb-financial-os.vercel.app — login + aislamiento de RLS probados ahí también con los mismos 2 usuarios de prueba. **Fase 0 100% completa.**
+- [x] **Identidad de git corregida para este repo (local, no global):** el `user.email` global de esta máquina es la cuenta de trabajo (WeWorkRemotely), que en GitHub resuelve a una cuenta distinta sin acceso al proyecto de Vercel → Vercel bloqueaba los deploys automáticos por push con `TEAM_ACCESS_REQUIRED`. Se configuró `git config --local user.name/user.email` = `zoharod` / `zoharod@gmail.com` (coincide con la cuenta de GitHub/Vercel dueña del proyecto) **solo en este repo**, sin tocar la config global de trabajo. Los commits previos a este fix quedaron con el autor de trabajo (no se reescribió el historial); los commits nuevos ya deployan automáticamente.
 
 ## 🔄 En progreso
 
