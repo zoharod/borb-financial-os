@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-03
-**Fase actual:** Fase 0 — Setup del proyecto (no iniciada aún)
+**Fase actual:** Fase 0 — Setup del proyecto (en progreso, falta deploy a Vercel)
 
 ---
 
@@ -17,19 +17,24 @@
 - [x] Decisión de stack confirmada: Next.js + Supabase + Tailwind + Vercel.
 - [x] Proyecto renombrado a **Borb Financial OS**.
 - [x] Screens de UI traídas de Google Stitch (proyecto "Borb Financial OS") a `docs/design/`: sistema de diseño (`design-system.md`), doc de arquitectura de experiencia (`experience-architecture.md`), y 4 screens con HTML+capturas en `docs/design/screens/`.
+- [x] Repo Next.js 16 (App Router, TypeScript estricto, Turbopack) + Tailwind v4 inicializado, con paleta/tipografía del design system de Stitch aplicada en `app/globals.css`.
+- [x] Estructura de carpetas de `architecture.md`: `app/(auth)/login`, `app/(dashboard)/dashboard`, `components/`, `lib/supabase` (client/server/middleware separados), `lib/providers` (TanStack Query + persistencia IndexedDB vía idb-keyval), `types/`.
+- [x] Proyecto Supabase creado por el usuario ("Financial-OS", ref `ujjoiqevyhincfotcyoh`, región us-west-2) y **linkeado** vía Supabase CLI (`supabase link`), autenticada con Personal Access Token.
+- [x] MCP de Supabase configurado en `.mcp.json` (scope proyecto, `read_only=true` por defecto) — pendiente que el usuario corra `/mcp` en una sesión interactiva para completar el login OAuth.
+- [x] Schema aplicado a Supabase real vía `supabase db push` (households, household_members, accounts, categories, budgets, transactions) con RLS.
+- [x] **Bug de RLS encontrado y corregido:** la policy de `household_members` usaba una subquery contra sí misma sin caso base → Postgres tiraba "infinite recursion detected in policy". Fix: función `public.user_household_ids()` `SECURITY DEFINER` (ver migraciones `20260803011339` y `20260803011546`). Todas las policies multi-tenant ahora pasan por esa función.
+- [x] Tipos TypeScript generados desde el schema real (`types/supabase.ts`, reemplaza el placeholder).
+- [x] Login con Supabase Auth probado end-to-end en navegador con 2 usuarios/households de prueba (`test-a@borb.test` → Casa Test A, `test-b@borb.test` → Casa Test B): cada uno ve únicamente su propio household. **Criterio de salida de Fase 0 cumplido** (login funciona, RLS aísla correctamente).
 
 ## 🔄 En progreso
 
-- Nada en desarrollo activo todavía. Este es el punto de partida para Claude Code.
+- Deploy esqueleto a Vercel — pendiente (requiere cuenta/autorización del usuario).
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Ejecutar Fase 0: inicializar repo Next.js + TypeScript + Tailwind.
-2. Crear proyecto Supabase y aplicar el schema de `architecture.md` (households, household_members, accounts, categories, budgets, transactions) con políticas RLS.
-3. Configurar Supabase Auth (email/password).
-4. Probar RLS con 2 households ficticios para confirmar aislamiento de datos.
-5. Deploy esqueleto a Vercel.
-6. **No avanzar a Fase 1 hasta que el criterio de salida de Fase 0 esté cumplido** (ver roadmap.md).
+1. Deploy inicial a Vercel (con las env vars de `.env.local` cargadas ahí) para cerrar Fase 0 al 100%.
+2. Una vez deployado, arrancar Fase 1: CRUD de Cuentas, Categorías, Transacciones, Presupuesto, Dashboard real (ver roadmap.md).
+3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base para seguir probando RLS — borrarlos antes de invitar usuarios reales.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 
