@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +33,23 @@ export default function LoginPage() {
 
     router.push("/dashboard");
     router.refresh();
+  }
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setGoogleLoading(true);
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+
+    if (error) {
+      setGoogleLoading(false);
+      setError(error.message);
+    }
+    // Si no hay error, el navegador redirige a Google — no hace falta más.
   }
 
   return (
@@ -81,6 +99,21 @@ export default function LoginPage() {
           className="w-full rounded-full bg-secondary text-on-secondary-container font-medium py-2 disabled:opacity-50"
         >
           {loading ? "Ingresando..." : "Ingresar"}
+        </button>
+
+        <div className="flex items-center gap-3 my-4">
+          <div className="h-px flex-1 bg-outline-variant/20" />
+          <span className="text-xs text-on-surface-variant">o</span>
+          <div className="h-px flex-1 bg-outline-variant/20" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+          className="w-full rounded-full border border-outline-variant text-on-surface font-medium py-2 disabled:opacity-50"
+        >
+          {googleLoading ? "Redirigiendo..." : "Continuar con Google"}
         </button>
       </form>
     </main>

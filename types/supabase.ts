@@ -260,7 +260,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_household_for_current_user: {
+        Args: { household_name: string }
+        Returns: string
+      }
+      user_household_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       [_ in never]: never

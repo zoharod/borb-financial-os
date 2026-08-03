@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-03
-**Fase actual:** Fase 1-B completa ✅ — lista para Fase 2 o para pulir Fase 1/1-B
+**Fase actual:** Fase 1-B completa ✅ + registro real con Google Auth agregado — lista para uso real o para Fase 2
 
 ---
 
@@ -38,15 +38,24 @@
 - [x] **Bug encontrado y corregido: cache de TanStack Query no estaba scoped por usuario.** Las queryKeys (`["accounts"]`, `["categories"]`, etc.) no incluían el id del usuario autenticado. Al probar la edición inline cambiando entre `test-a` y `test-b` en el mismo navegador, la cache persistida en IndexedDB de un usuario (ej. "0 cuentas" de Casa Test A) se le quedó pegada al otro usuario (Casa Test B, que sí tenía una cuenta) — la página mostraba "no hay cuentas" aunque la cuenta existía en la base (confirmado con curl directo a la API). Fix sistémico: nuevo hook `lib/hooks/use-auth-user-id.ts` (`useAuthUserId()`, se suscribe a `onAuthStateChange`); **todos** los hooks de datos (`use-current-household`, `use-accounts`, `use-categories`, `use-transactions`, `use-budgets`, `use-dashboard-summary`) ahora incluyen `userId` en su queryKey y usan `enabled: !!userId` (también evita que la query dispare antes de que la sesión esté lista). Regla documentada en `architecture.md`. Verificado manualmente: test-b → test-a → test-b en el mismo navegador, cada uno ve sus datos correctos sin mezcla.
 - [x] **Fase 1-B completa: importación de CSV.** Nueva página `/transactions/import`: elegir cuenta → subir CSV (columnas fecha/descripción/monto, parseado con `papaparse` en `lib/csv.ts`) → preview con checkboxes → importar en bloque (`useBulkCreateTransactions` en `lib/hooks/use-csv-import.ts`, graba `source='csv'`). Detección de duplicados básica: compara `(fecha, monto, moneda)` contra transacciones existentes de la cuenta elegida (`useExistingTransactionKeys`); las filas que matchean aparecen destildadas en la preview. Categoría queda `null` en la importación — se categoriza después con la edición inline. Probado en navegador: import exitoso de 2 filas + 1 duplicado detectado correctamente (coincidía con una transacción manual ya cargada), dashboard actualizado con los montos correctos, y error claro al subir un CSV con columnas equivocadas.
 
+- [x] **Registro real con Google Auth + onboarding de household.** El usuario decidió usar Google OAuth en vez de email/password para su cuenta real (evita el problema de confirmación de email y no requiere manejar contraseñas). Agregado:
+  - Botón "Continuar con Google" en `/login` (`supabase.auth.signInWithOAuth`), junto con el form de email/password existente (se mantiene para los usuarios de prueba).
+  - `app/auth/callback/route.ts` — intercambia el code OAuth por sesión (`exchangeCodeForSession`), agregado a `PUBLIC_PATHS` en `lib/supabase/middleware.ts`.
+  - Función `SECURITY DEFINER` `public.create_household_for_current_user(household_name)` (migración `20260803173240`) — resuelve el mismo problema de "huevo y gallina" de RLS que `user_household_ids()`, pero para el INSERT inicial de household+membership de un usuario que todavía no pertenece a ninguno.
+  - `use-current-household.ts` cambiado de `.single()` a `.maybeSingle()` (0 filas ya no es un error) + nuevo `useCreateHousehold()`.
+  - `components/household-guard.tsx`: envuelve el contenido del dashboard; si el usuario no tiene household todavía, muestra un formulario "Nombrá tu hogar" en vez del contenido normal.
+  - Cliente OAuth de Google creado por el usuario en Google Cloud Console, configurado en Supabase Auth (`external_google_enabled=true`) vía Management API.
+  - **Probado:** login con `test-b` (ya tenía household) sigue funcionando sin pasar por el onboarding; usuario nuevo sin household ve el formulario, lo completa, y entra al dashboard normal (probado con un usuario de prueba temporal, ya borrado). El botón "Continuar con Google" redirige correctamente a la pantalla real de Google mostrando "continuar a Borb Financial OS" y la cuenta del usuario — no se completó el login real (requiere que el usuario lo haga él mismo con su contraseña de Google).
+
 ## 🔄 En progreso
 
-- Nada — Fase 1 y Fase 1-B cerradas.
+- Nada cerrado — pendiente que el usuario complete el login con Google él mismo para confirmar el flujo 100% de punta a punta (yo verifiqué hasta la pantalla de selección de cuenta de Google, no puedo ni debo completarlo).
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Decidir: ¿Fase 2 (Tarjetas y Cashback) o seguir puliendo Fase 1/1-B (ej. resolver semántica de `transfer` con 2 cuentas, mapeo de columnas más flexible para CSV)?
-2. Empujar y verificar en producción el trabajo de esta sesión (import CSV).
-3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción), ahora con datos de ejemplo en Casa Test B (cuenta "Ahorro L", categoría "Comida", 4 transacciones —2 manuales + 2 importadas por CSV—, 1 presupuesto) — borrarlos antes de invitar usuarios reales.
+1. Confirmar con el usuario que el login con Google funcionó completo (crea household, entra al dashboard) — si falla algo, revisar el redirect URI en Google Cloud Console vs. el configurado (`https://ujjoiqevyhincfotcyoh.supabase.co/auth/v1/callback`).
+2. Decidir: ¿Fase 2 (Tarjetas y Cashback) o seguir puliendo Fase 1/1-B (ej. resolver semántica de `transfer` con 2 cuentas, mapeo de columnas más flexible para CSV)?
+3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción) con datos de ejemplo en Casa Test B — no afectan al household real del usuario (aislados por RLS), pero borrarlos en algún momento si molesta tenerlos.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 

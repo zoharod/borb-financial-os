@@ -44,6 +44,45 @@ household_id IN (SELECT public.user_household_ids())
 
 Cualquier tabla nueva de una fase futura (`cards`, `goals`, `annual_funds`, etc.) debe usar `public.user_household_ids()` en su policy, no la subquery directa.
 
+## Registro / Onboarding (crear household)
+
+Fase 1 solo tenía login (los 2 households de prueba se crearon a mano vía API con `service_role`, no hay UI de registro). Para que un usuario real pueda entrar solo, se agrega:
+
+- **Auth: Google OAuth** (en vez de email/password) — decisión explícita del usuario, evita además el problema de confirmación de email (Google ya lo verificó). Requiere un cliente OAuth de Google (Client ID + Secret) creado por el usuario en Google Cloud Console y configurado como provider en Supabase Auth.
+- **Ruta de callback:** `app/auth/callback/route.ts` — intercambia el `code` del flujo OAuth por una sesión (`exchangeCodeForSession`) y redirige a `/dashboard`.
+- **Creación de household al primer login:** mismo problema de "huevo y gallina" que ya resolvimos para RLS — un usuario recién autenticado no pertenece a ningún `household_members` todavía, así que no puede insertar su propio household ni membership desde el cliente (RLS lo bloquea, no hay policy de INSERT en `households` y la de `household_members` requiere ya pertenecer a un household). Se resuelve con otra función `SECURITY DEFINER`:
+
+```sql
+create or replace function public.create_household_for_current_user(household_name text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_household_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not authenticated';
+  end if;
+  if exists (select 1 from household_members where user_id = auth.uid()) then
+    raise exception 'user already belongs to a household';
+  end if;
+
+  insert into households (name) values (household_name) returning id into new_household_id;
+  insert into household_members (household_id, user_id, role) values (new_household_id, auth.uid(), 'owner');
+
+  return new_household_id;
+end;
+$$;
+
+revoke all on function public.create_household_for_current_user(text) from public;
+grant execute on function public.create_household_for_current_user(text) to authenticated;
+```
+
+- **`use-current-household.ts` usa `.maybeSingle()`, no `.single()`** — con `.single()`, 0 filas es un error (`PGRST116`); un usuario recién logueado sin household todavía necesita que esto devuelva `null` limpiamente, no que explote.
+- **`components/household-guard.tsx`** (client component, envuelve `{children}` en `app/(dashboard)/layout.tsx`): mientras carga `useCurrentHousehold()` muestra un spinner; si no hay household, muestra un formulario "Nombrá tu hogar" que llama a la función de arriba vía `supabase.rpc(...)`; si ya hay household, renderiza el contenido normal.
+
 ## Esquema de base de datos — Fase 1
 
 ```sql
