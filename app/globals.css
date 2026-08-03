@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/*
+  Paleta y tipografía tomadas de docs/design/design-system.md
+  (sistema "Aura Finance" generado en Stitch — calm intelligence / glassmorphism, dark-only).
+*/
+:root {
+  --background: #081425;
+  --on-background: #d8e3fb;
+
+  --surface: #081425;
+  --surface-dim: #081425;
+  --surface-bright: #2f3a4c;
+  --surface-container-lowest: #040e1f;
+  --surface-container-low: #111c2d;
+  --surface-container: #152031;
+  --surface-container-high: #1f2a3c;
+  --surface-container-highest: #2a3548;
+  --on-surface: #d8e3fb;
+  --on-surface-variant: #c6c6ca;
+  --surface-variant: #2a3548;
+
+  --outline: #8f9094;
+  --outline-variant: #45474a;
+
+  --primary: #c6c6ca;
+  --on-primary: #2f3034;
+  --primary-container: #121417;
+  --on-primary-container: #7d7e82;
+
+  --secondary: #44e2cd;
+  --on-secondary: #003731;
+  --secondary-container: #03c6b2;
+  --on-secondary-container: #004d44;
+
+  --tertiary: #b9c8de;
+  --on-tertiary: #233143;
+  --tertiary-container: #051525;
+  --on-tertiary-container: #718094;
+
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-on-background: var(--on-background);
+
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-surface-variant: var(--surface-variant);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+
+  --color-tertiary: var(--tertiary);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 1.5rem;
+  --radius-lg: 2rem;
+  --radius-xl: 3rem;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-on-background);
+}
