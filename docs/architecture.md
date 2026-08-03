@@ -122,6 +122,17 @@ saldo = SUM(transactions.amount donde account_id = X y currency = misma moneda,
 
 (Decisión de implementación: calcular on-the-fly vs. cachear con trigger — evaluar en Fase 1 según performance real, no bloquea el diseño.)
 
+## Importación CSV (Fase 1-B)
+
+- **Formato esperado:** CSV con 3 columnas, encabezados case-insensitive (acentos opcionales): `fecha`/`date`, `descripcion`/`descripción`/`description`, `monto`/`amount`. No se construye UI de mapeo de columnas — si el CSV no trae esos encabezados, se muestra un error explicando el formato esperado. Mantiene el alcance "simple" del roadmap; un mapeo de columnas flexible queda para si se necesita más adelante.
+- **Cuenta y moneda:** el usuario elige a qué `account_id` pertenece el archivo (un estado de cuenta es de una sola cuenta bancaria); la moneda de cada transacción importada es la de esa cuenta — igual que en el registro manual.
+- **Signo → tipo:** `monto < 0` → `type='expense'` (se guarda `abs(monto)`); `monto > 0` → `type='income'`. No se infiere `transfer` desde CSV (un estado de cuenta no distingue transferencias de otros movimientos sin más contexto).
+- **Categoría:** queda `null` en la importación — no se auto-categoriza. El usuario categoriza después con la edición inline que ya existe en Transacciones.
+- **`source`:** se graba `'csv'` (columna reservada desde Fase 0/1, ver schema).
+- **Detección de duplicados (básica, no perfecta):** antes de importar, se comparan las filas parseadas contra las transacciones ya existentes de esa cuenta por `(transaction_date, amount, currency)` exactos. Las filas que matchean se marcan como posible duplicado y aparecen desmarcadas en la preview (el usuario puede tildarlas igual si quiere forzar la importación). No usa `reconciled_at` todavía — esa columna queda reservada para una conciliación más robusta en una fase posterior.
+- **Flujo:** subir archivo → parsear y mostrar preview con checkboxes (fila con posible duplicado empieza destildada) → confirmar → insert en bloque de las filas tildadas.
+- **Parser:** `papaparse` (maneja comillas/comas embebidas de exports bancarios reales; no vale la pena un parser CSV a mano para este caso).
+
 ## Moneda
 
 HNL y USD se tratan como monedas **independientes**, sin conversión automática en Fase 1. El dashboard reporta cada una por separado (igual que el Excel actual del usuario).
@@ -152,27 +163,28 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 
 ## Estructura de carpetas (Next.js)
 
-`✅` = ya existe (Fase 0). Sin marcar = se crea cuando esa fase la necesite (no crear carpetas vacías por adelantado).
+`✅` = ya existe. Sin marcar = se crea cuando esa fase la necesite (no crear carpetas vacías por adelantado).
 
 ```
 /proxy.ts                     ✅ sesión/redirect (ver "Sesión / Auth")
 /app
   /(auth)/login                ✅
-  /(dashboard)/layout.tsx      ✅ (guard de auth + header)
-  /(dashboard)/dashboard       ✅
-  /(dashboard)/accounts        — Fase 1
-  /(dashboard)/transactions    — Fase 1
-  /(dashboard)/budgets         — Fase 1
-  /(dashboard)/categories      — Fase 1
+  /(dashboard)/layout.tsx      ✅ (guard de auth + header + nav)
+  /(dashboard)/dashboard       ✅ Fase 1
+  /(dashboard)/accounts        ✅ Fase 1 (CRUD + edición inline)
+  /(dashboard)/transactions    ✅ Fase 1 (CRUD + edición inline)
+  /(dashboard)/transactions/import — Fase 1-B, importación CSV
+  /(dashboard)/budgets         ✅ Fase 1
+  /(dashboard)/categories      ✅ Fase 1 (CRUD + edición inline)
 /components
   sign-out-button.tsx          ✅
-  /ui                          — Fase 1, componentes Tailwind reutilizables
-  /dashboard                   — Fase 1
-  /transactions                — Fase 1
+  nav-links.tsx                 ✅
+  /ui                          ✅ Fase 1 (Button, Input, Select, Card)
 /lib
   /supabase                    ✅ client.ts / server.ts / middleware.ts
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
-  /hooks                       — Fase 1, React Query hooks
+  /hooks                       ✅ Fase 1, React Query hooks (uno por recurso + use-auth-user-id.ts)
+  csv.ts                        — Fase 1-B, parseo de CSV (papaparse)
 /types
   supabase.ts                  ✅ generado con `supabase gen types typescript --linked`
 /supabase

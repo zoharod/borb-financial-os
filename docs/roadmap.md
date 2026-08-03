@@ -42,10 +42,12 @@ Activa versión simple de: Capturar, Administrar, Analizar, Presentar.
 ---
 
 ## Fase 1-B — Importación de datos
-**Estado: no iniciada**
+**Estado: ✅ completa**
 
-- Importación de CSV / estados de cuenta.
-- Detección de duplicados básica (conciliación simple contra transacciones ya existentes).
+- [x] Importación de CSV / estados de cuenta — formato simple de 3 columnas (fecha, descripción, monto), sin UI de mapeo de columnas. Ver `architecture.md` → "Importación CSV (Fase 1-B)".
+- [x] Detección de duplicados básica (conciliación simple contra transacciones ya existentes) — compara fecha+monto+moneda exactos dentro de la cuenta elegida; filas que matchean quedan destildadas en la preview por defecto.
+
+Probado en navegador: parseo, preview, un caso de duplicado detectado correctamente, import en bloque, error claro con un CSV de columnas equivocadas.
 
 ---
 

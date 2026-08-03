@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-03
-**Fase actual:** Fase 1 completa ✅ — lista para Fase 1-B o para pulir Fase 1
+**Fase actual:** Fase 1-B completa ✅ — lista para Fase 2 o para pulir Fase 1/1-B
 
 ---
 
@@ -36,16 +36,17 @@
 - [x] **Limitación conocida (documentar, no bloquea Fase 1):** el saldo de cuentas trata `type='transfer'` como salida de la cuenta de origen (resta), porque el schema actual (`transactions.account_id`, sin cuenta destino) no permite saber si una fila de transferencia es el lado "entrada" o "salida". Revisar si hace falta un campo `to_account_id` o conciliación entre cuentas cuando se use `transfer` de verdad — ver `lib/hooks/use-dashboard-summary.ts`.
 - [x] **Edición inline agregada a Cuentas, Categorías y Transacciones** (antes solo tenían crear+eliminar). Patrón: cada fila de la lista es su propio componente (`AccountRow`, `CategoryRow`, `TransactionRow`) con estado local `isEditing` que alterna entre vista y un mini-formulario precargado con los valores actuales; usan los `useUpdate*` de cada hook (`use-accounts.ts`, `use-categories.ts` ya tenía `useUpdateAccount`; se agregó `useUpdateCategory` y `useUpdateTransaction`).
 - [x] **Bug encontrado y corregido: cache de TanStack Query no estaba scoped por usuario.** Las queryKeys (`["accounts"]`, `["categories"]`, etc.) no incluían el id del usuario autenticado. Al probar la edición inline cambiando entre `test-a` y `test-b` en el mismo navegador, la cache persistida en IndexedDB de un usuario (ej. "0 cuentas" de Casa Test A) se le quedó pegada al otro usuario (Casa Test B, que sí tenía una cuenta) — la página mostraba "no hay cuentas" aunque la cuenta existía en la base (confirmado con curl directo a la API). Fix sistémico: nuevo hook `lib/hooks/use-auth-user-id.ts` (`useAuthUserId()`, se suscribe a `onAuthStateChange`); **todos** los hooks de datos (`use-current-household`, `use-accounts`, `use-categories`, `use-transactions`, `use-budgets`, `use-dashboard-summary`) ahora incluyen `userId` en su queryKey y usan `enabled: !!userId` (también evita que la query dispare antes de que la sesión esté lista). Regla documentada en `architecture.md`. Verificado manualmente: test-b → test-a → test-b en el mismo navegador, cada uno ve sus datos correctos sin mezcla.
+- [x] **Fase 1-B completa: importación de CSV.** Nueva página `/transactions/import`: elegir cuenta → subir CSV (columnas fecha/descripción/monto, parseado con `papaparse` en `lib/csv.ts`) → preview con checkboxes → importar en bloque (`useBulkCreateTransactions` en `lib/hooks/use-csv-import.ts`, graba `source='csv'`). Detección de duplicados básica: compara `(fecha, monto, moneda)` contra transacciones existentes de la cuenta elegida (`useExistingTransactionKeys`); las filas que matchean aparecen destildadas en la preview. Categoría queda `null` en la importación — se categoriza después con la edición inline. Probado en navegador: import exitoso de 2 filas + 1 duplicado detectado correctamente (coincidía con una transacción manual ya cargada), dashboard actualizado con los montos correctos, y error claro al subir un CSV con columnas equivocadas.
 
 ## 🔄 En progreso
 
-- Nada — Fase 1 cerrada (con edición inline).
+- Nada — Fase 1 y Fase 1-B cerradas.
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Decidir: ¿Fase 1-B (importación CSV) o seguir puliendo Fase 1 (ej. resolver semántica de `transfer` con 2 cuentas)?
-2. Confirmar que el deploy de esta sesión (edición inline + fix de cache por usuario) quedó bien en producción tras el push.
-3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción), ahora con datos de ejemplo en Casa Test B (cuenta "Ahorro L", categoría "Comida", 2 transacciones, 1 presupuesto) — borrarlos antes de invitar usuarios reales.
+1. Decidir: ¿Fase 2 (Tarjetas y Cashback) o seguir puliendo Fase 1/1-B (ej. resolver semántica de `transfer` con 2 cuentas, mapeo de columnas más flexible para CSV)?
+2. Empujar y verificar en producción el trabajo de esta sesión (import CSV).
+3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción), ahora con datos de ejemplo en Casa Test B (cuenta "Ahorro L", categoría "Comida", 4 transacciones —2 manuales + 2 importadas por CSV—, 1 presupuesto) — borrarlos antes de invitar usuarios reales.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label } from "@/components/ui/input";
@@ -95,9 +96,17 @@ export default function TransactionsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-on-surface mb-6">
-        Transacciones
-      </h1>
+      <div className="flex items-baseline justify-between mb-6">
+        <h1 className="text-xl font-semibold text-on-surface">
+          Transacciones
+        </h1>
+        <Link
+          href="/transactions/import"
+          className="text-xs text-on-surface-variant hover:text-on-surface underline"
+        >
+          Importar CSV
+        </Link>
+      </div>
 
       <Card className="mb-6">
         {noAccounts ? (
