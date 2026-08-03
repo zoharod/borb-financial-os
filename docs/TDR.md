@@ -27,7 +27,7 @@ household_members
   id, household_id (FK), user_id (FK -> auth.users), role, joined_at
 ```
 
-RLS en TODAS las tablas de datos: `household_id IN (SELECT household_id FROM household_members WHERE user_id = auth.uid())`. No negociable desde el primer schema.
+RLS en TODAS las tablas de datos, filtrando por `household_id`. No negociable desde el primer schema. **Detalle de implementación exacto (patrón real, con el fix de recursión de RLS encontrado en Fase 0) en `architecture.md` → "Multi-tenancy" — no usar la subquery ingenua directa contra `household_members`.**
 
 ## 3. Modelo de datos — Fase 1
 

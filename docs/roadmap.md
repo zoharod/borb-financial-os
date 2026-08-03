@@ -12,15 +12,15 @@ Optimizar → Proyectar → Presentar → Alertar → Automatizar → Aprender �
 ---
 
 ## Fase 0 — Setup del proyecto
-**Estado: pendiente de iniciar**
+**Estado: casi completa — falta solo el deploy a Vercel**
 
-- Inicializar repo Next.js + TypeScript + Tailwind.
-- Crear proyecto Supabase, configurar variables de entorno.
-- Crear schema inicial (`households`, `household_members`, `accounts`, `categories`, `budgets`, `transactions`) con RLS.
-- Configurar Supabase Auth (email/password).
-- Deploy inicial a Vercel (esqueleto, "Hello World" autenticado).
+- [x] Inicializar repo Next.js + TypeScript + Tailwind.
+- [x] Crear proyecto Supabase, configurar variables de entorno.
+- [x] Crear schema inicial (`households`, `household_members`, `accounts`, `categories`, `budgets`, `transactions`) con RLS.
+- [x] Configurar Supabase Auth (email/password).
+- [ ] Deploy inicial a Vercel (esqueleto, "Hello World" autenticado).
 
-**Criterio de salida:** login funciona, RLS probado con 2 hogares de prueba que NO se ven datos entre sí.
+**Criterio de salida:** login funciona, RLS probado con 2 hogares de prueba que NO se ven datos entre sí. **✅ Cumplido** — probado en navegador con `test-a@borb.test` / `test-b@borb.test` (ver `project_state.md`). Detalle técnico del bug de RLS encontrado y su fix en `architecture.md` ("Multi-tenancy").
 
 ---
 

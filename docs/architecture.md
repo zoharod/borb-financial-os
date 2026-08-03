@@ -4,11 +4,13 @@
 
 ## Stack
 
-- **Frontend/Full-stack:** Next.js (App Router, TypeScript)
-- **Estilos:** Tailwind CSS
+- **Frontend/Full-stack:** Next.js 16 (App Router, TypeScript estricto, Turbopack)
+- **Estilos:** Tailwind CSS v4 (theming vía `@theme` en `app/globals.css`, sin `tailwind.config.js`)
 - **Backend/DB/Auth/Storage:** Supabase (Postgres + Auth + Storage, RLS)
 - **Hosting:** Vercel (app) + Supabase Cloud (datos)
-- **Cache/estado cliente:** TanStack Query + persistencia IndexedDB (soporte offline simple)
+- **Cache/estado cliente:** TanStack Query + persistencia IndexedDB vía `idb-keyval` (soporte offline simple)
+
+**Nota de versión (Next.js 16):** el archivo de sesión/edge ya no se llama `middleware.ts` sino `proxy.ts` (mismo propósito, convención renombrada). Ver "Sesión / Auth" más abajo.
 
 ## Principio de diseño
 
@@ -16,14 +18,31 @@
 
 ## Multi-tenancy (Household)
 
-Cada dato pertenece a un `household_id`. Un hogar tiene 2+ `household_members` (usuarios). RLS obligatorio en toda tabla de datos:
+Cada dato pertenece a un `household_id`. Un hogar tiene 2+ `household_members` (usuarios). RLS obligatorio en toda tabla de datos.
+
+**⚠️ Patrón real (no el ingenuo).** La subquery obvia —`household_id IN (SELECT household_id FROM household_members WHERE user_id = auth.uid())`— **falla con "infinite recursion detected in policy"** en cuanto se aplica como policy de `household_members` sobre sí misma (Postgres no permite que una policy dependa de una subquery sobre la misma tabla que protege, sin importar si hay una rama `OR` sin subquery). Se descubrió en Fase 0 al probar login con 2 households reales — ver `project_state.md`.
+
+**Fix aplicado (usar siempre esta versión):** una función `SECURITY DEFINER`, propiedad de `postgres` (dueño de las tablas), que lee `household_members` sin volver a pasar por RLS:
 
 ```sql
--- Patrón de política RLS a replicar en cada tabla
-household_id IN (
-  SELECT household_id FROM household_members WHERE user_id = auth.uid()
-)
+create or replace function public.user_household_ids()
+returns setof uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select household_id from household_members where user_id = auth.uid()
+$$;
+
+revoke all on function public.user_household_ids() from public;
+grant execute on function public.user_household_ids() to authenticated;
+
+-- Patrón de política RLS a replicar en TODA tabla nueva (incluida household_members)
+household_id IN (SELECT public.user_household_ids())
 ```
+
+Cualquier tabla nueva de una fase futura (`cards`, `goals`, `annual_funds`, etc.) debe usar `public.user_household_ids()` en su policy, no la subquery directa.
 
 ## Esquema de base de datos — Fase 1
 
@@ -115,28 +134,45 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 
 ## Seguridad
 
-- RLS en todas las tablas desde el día 1.
+- RLS en todas las tablas desde el día 1 — ver patrón obligatorio en "Multi-tenancy" arriba.
 - Auth vía Supabase Auth (email/password en Fase 1).
 - Service role key solo en server-side (env vars de Vercel), nunca en cliente.
+- Supabase emite dos formatos de key equivalentes; usamos el nuevo (`sb_publishable_...` / `sb_secret_...`) en vez del legacy JWT (`anon` / `service_role`):
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = key `sb_publishable_...` (pública, cliente).
+  - `SUPABASE_SERVICE_ROLE_KEY` = key `sb_secret_...` (secreta, solo server-side).
 
-## Estructura de carpetas propuesta (Next.js)
+### Sesión / Auth (Next.js 16)
+
+- `proxy.ts` en la raíz (reemplaza al `middleware.ts` de versiones anteriores de Next.js) llama a `lib/supabase/middleware.ts::updateSession()` en cada request: refresca la sesión y redirige a `/login` si no hay usuario autenticado.
+- Clientes de Supabase separados (`lib/supabase/client.ts` para Client Components, `lib/supabase/server.ts` para Server Components) — ambos crean el cliente de forma perezosa (dentro del handler/evento, no en el top-level del componente) para no romper el build estático cuando las env vars todavía no están configuradas.
+
+## Estructura de carpetas (Next.js)
+
+`✅` = ya existe (Fase 0). Sin marcar = se crea cuando esa fase la necesite (no crear carpetas vacías por adelantado).
 
 ```
+/proxy.ts                     ✅ sesión/redirect (ver "Sesión / Auth")
 /app
-  /(auth)/login
-  /(dashboard)/dashboard
-  /(dashboard)/accounts
-  /(dashboard)/transactions
-  /(dashboard)/budgets
-  /(dashboard)/categories
+  /(auth)/login                ✅
+  /(dashboard)/layout.tsx      ✅ (guard de auth + header)
+  /(dashboard)/dashboard       ✅
+  /(dashboard)/accounts        — Fase 1
+  /(dashboard)/transactions    — Fase 1
+  /(dashboard)/budgets         — Fase 1
+  /(dashboard)/categories      — Fase 1
 /components
-  /ui        -- componentes Tailwind reutilizables
-  /dashboard
-  /transactions
+  sign-out-button.tsx          ✅
+  /ui                          — Fase 1, componentes Tailwind reutilizables
+  /dashboard                   — Fase 1
+  /transactions                — Fase 1
 /lib
-  /supabase  -- clients (server/client), queries
-  /hooks     -- React Query hooks
-/types       -- tipos generados de Supabase + tipos de dominio
+  /supabase                    ✅ client.ts / server.ts / middleware.ts
+  /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
+  /hooks                       — Fase 1, React Query hooks
+/types
+  supabase.ts                  ✅ generado con `supabase gen types typescript --linked`
+/supabase
+  /migrations                  ✅ una migración SQL por cambio de schema/RLS
 ```
 
 ## No-funcionales

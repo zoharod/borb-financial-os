@@ -16,7 +16,7 @@ Este proyecto es **Borb Financial OS**, una app de finanzas personales para un h
 
 ## Principios no negociables
 
-- **Multi-tenant desde el día 1:** todo dato cuelga de `household_id`. Ninguna tabla de datos de negocio se crea sin política RLS.
+- **Multi-tenant desde el día 1:** todo dato cuelga de `household_id`. Ninguna tabla de datos de negocio se crea sin política RLS. **Usar siempre `household_id IN (SELECT public.user_household_ids())`** en la policy — la subquery directa contra `household_members` causa "infinite recursion detected in policy" (bug real encontrado en Fase 0, ver `docs/architecture.md` → "Multi-tenancy").
 - **`transactions` es la fuente única de verdad.** Saldos, presupuesto vs. real, y todo cálculo futuro se derivan de ahí, nunca se editan en paralelo.
 - **No construir features fuera de la fase actual.** Si algo suena a Fase 2+ (tarjetas, IA, importación, reportes avanzados), no se implementa aunque sea fácil de "meter de una vez" — se anota en `roadmap.md` si no está ya.
 - **Columnas reservadas ya existen** (`transactions.source`, `card_id`, `reconciled_at`) para que fases futuras no requieran migraciones destructivas — no eliminarlas ni ignorarlas.
