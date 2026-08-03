@@ -1,5 +1,5 @@
 # TDR — Technical Design Requirements
-## Sistema Financiero Personal (Household Finance OS)
+## Sistema Financiero Personal (Borb Financial OS)
 
 **Versión:** 1.0 — Aprobado
 **Depende de:** PRD.md v1.0

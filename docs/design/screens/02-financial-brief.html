@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Finance OS - Brief</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-dim": "#0b1326",
+                "on-tertiary-fixed": "#301400",
+                "on-primary-container": "#ede0ff",
+                "surface-container-low": "#131b2e",
+                "inverse-on-surface": "#283044",
+                "surface-container-highest": "#2d3449",
+                "secondary-container": "#00a572",
+                "on-primary-fixed-variant": "#5a00c6",
+                "outline-variant": "#4a4455",
+                "surface-bright": "#31394d",
+                "surface": "#0b1326",
+                "on-secondary-container": "#00311f",
+                "surface-container-lowest": "#060e20",
+                "on-secondary-fixed": "#002113",
+                "on-tertiary": "#4f2500",
+                "on-error-container": "#ffdad6",
+                "tertiary-fixed-dim": "#ffb784",
+                "tertiary": "#ffb784",
+                "tertiary-container": "#a15100",
+                "inverse-primary": "#732ee4",
+                "on-tertiary-container": "#ffe0cd",
+                "secondary-fixed-dim": "#4edea3",
+                "error": "#ffb4ab",
+                "surface-container-high": "#222a3d",
+                "on-secondary": "#003824",
+                "on-primary": "#3f008e",
+                "primary-container": "#7c3aed",
+                "error-container": "#93000a",
+                "on-tertiary-fixed-variant": "#713700",
+                "on-error": "#690005",
+                "secondary": "#4edea3",
+                "on-surface": "#dae2fd",
+                "on-primary-fixed": "#25005a",
+                "on-surface-variant": "#ccc3d8",
+                "secondary-fixed": "#6ffbbe",
+                "surface-variant": "#2d3449",
+                "on-background": "#dae2fd",
+                "primary-fixed-dim": "#d2bbff",
+                "surface-container": "#171f33",
+                "primary": "#d2bbff",
+                "on-secondary-fixed-variant": "#005236",
+                "surface-tint": "#d2bbff",
+                "primary-fixed": "#eaddff",
+                "tertiary-fixed": "#ffdcc6",
+                "inverse-surface": "#dae2fd",
+                "background": "#0b1326",
+                "outline": "#958da1"
+        },
+        "borderRadius": {
+                "DEFAULT": "1rem",
+                "lg": "2rem",
+                "xl": "3rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "xl": "64px",
+                "margin-mobile": "16px",
+                "lg": "40px",
+                "md": "24px",
+                "sm": "12px",
+                "xs": "4px",
+                "base": "8px",
+                "margin-desktop": "48px",
+                "gutter": "24px"
+        },
+        "fontFamily": {
+                "headline-md": ["Outfit"],
+                "display-lg": ["Outfit"],
+                "display-lg-mobile": ["Outfit"],
+                "body-lg": ["Outfit"],
+                "label-md": ["Outfit"],
+                "label-sm": ["Outfit"],
+                "headline-lg": ["Outfit"],
+                "body-md": ["Outfit"]
+        },
+        "fontSize": {
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "display-lg-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+        }
+      },
+    },
+  }
+</script>
+<style>
+        .glass-card {
+            background: rgba(23, 31, 51, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.02);
+        }
+        .sunken-input {
+            background: rgba(6, 14, 32, 0.5);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0b1326;
+            color: #dae2fd;
+        }
+        .fade-in {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-body-md overflow-x-hidden pb-32">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/5 flex justify-between items-center px-margin-mobile h-16">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full overflow-hidden border border-outline/20">
+<img class="w-full h-full object-cover" data-alt="A sophisticated close-up portrait of a professional couple" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMNJVfRnctBUfrp5YZ_xNi7fDyFxK1p9o-PwrRiOMDKG8VxNKWe7TKZCcwg51J_XA3aqWv3GGFeQROstATAZS46CZjFUlof-4j2UM2r3H-uBiBZ47xEfOoIE3yBmg-t1-cuG8oprjX05cLusEK5_ouCzqPUys4xaB2eoPQyp0mTgZG3VqjXYvm9gBIkP2D_zFo23aFALyPjnYk01rQtaVHhQS8Goqh8epMEgZ0okva-SF4gv2KO5ZxWw"/>
+</div>
+</div>
+<h1 class="font-label-md text-label-md tracking-widest text-primary uppercase">FINANCE OS</h1>
+<button class="text-on-surface-variant hover:opacity-80 transition-opacity active:scale-90 transition-transform">
+<span class="material-symbols-outlined">search</span>
+</button>
+</header>
+<main class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop pt-24 space-y-xl">
+<!-- Hero Section: Safe to Spend -->
+<section class="fade-in text-center space-y-4 py-8">
+<p class="font-label-sm text-label-sm text-primary/60 uppercase">CURRENT LIQUIDITY</p>
+<div class="space-y-1">
+<h2 class="font-display-lg-mobile md:font-display-lg text-display-lg-mobile md:text-display-lg">L12,450</h2>
+<div class="flex items-center justify-center gap-2 text-secondary">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span class="font-label-sm text-label-sm uppercase">+4.2% FROM LAST WEEK</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">Safe to Spend</p>
+</section>
+<!-- Feed: Intelligence Cards -->
+<section class="space-y-gutter">
+<div class="flex justify-between items-end">
+<h3 class="font-headline-md text-headline-md text-primary">Intelligence Feed</h3>
+<span class="font-label-sm text-label-sm text-secondary uppercase">3 NEW INSIGHTS</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-1 gap-gutter">
+<!-- Urgent Action Card -->
+<div class="glass-card rounded-lg p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-container-high transition-colors duration-300">
+<div class="flex items-start gap-6">
+<div class="w-12 h-12 rounded-full bg-error-container/20 flex items-center justify-center text-error border border-error/20">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">priority_high</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-error uppercase">URGENT ACTION</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">LIQUIDITY RISK</span>
+</div>
+<h4 class="font-headline-md text-headline-md">Amex payment due in 2 days</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Automated transfer scheduled for <span class="text-on-surface">L4,200</span> from Vault.</p>
+</div>
+</div>
+<button class="bg-secondary text-on-secondary px-8 py-3 rounded-full font-label-md text-label-md hover:shadow-[0_0_15px_rgba(78,222,163,0.3)] transition-all uppercase">REVIEW</button>
+</div>
+<!-- Optimization Card -->
+<div class="glass-card rounded-lg p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-container-high transition-colors duration-300">
+<div class="flex items-start gap-6">
+<div class="w-12 h-12 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary border border-secondary/20">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-secondary uppercase">OPTIMIZATION</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">REWARDS ACTIVATED</span>
+</div>
+<h4 class="font-headline-md text-headline-md">Use your Capital One card today</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Get <span class="text-secondary">3% cashback</span> at Groceries based on your current location.</p>
+</div>
+</div>
+<button class="border border-outline text-on-surface px-8 py-3 rounded-full font-label-md text-label-md hover:bg-surface-variant transition-all uppercase">DETAILS</button>
+</div>
+<!-- Anomaly Card -->
+<div class="glass-card rounded-lg p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-surface-container-high transition-colors duration-300">
+<div class="flex items-start gap-6">
+<div class="w-12 h-12 rounded-full bg-tertiary-container/40 flex items-center justify-center text-tertiary border border-tertiary/20">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">monitoring</span>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-2">
+<span class="font-label-sm text-label-sm text-tertiary uppercase">ANOMALY</span>
+<span class="w-1 h-1 rounded-full bg-outline-variant"></span>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">SUBSCRIPTION</span>
+</div>
+<h4 class="font-headline-md text-headline-md">Unusual L150 charge at Spotify</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">This exceeds your typical monthly spend by <span class="text-on-surface">L135</span>.</p>
+</div>
+</div>
+<button class="border border-outline text-on-surface px-8 py-3 rounded-full font-label-md text-label-md hover:bg-surface-variant transition-all uppercase">RESOLVE</button>
+</div>
+</div>
+</section>
+<!-- Progressive Disclosure Section (Subtle Footer Insights) -->
+<section class="pt-8 border-t border-white/5 opacity-50 hover:opacity-100 transition-opacity">
+<details class="group cursor-pointer">
+<summary class="flex items-center justify-between font-label-md text-label-md text-primary list-none uppercase">
+<span>SYSTEM HEALTH &amp; INTEGRATIONS</span>
+<span class="material-symbols-outlined group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-gutter py-8">
+<div class="space-y-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">BANKING</p>
+<p class="font-body-md text-body-md text-secondary">3 Connected</p>
+</div>
+<div class="space-y-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">AI ENGINE</p>
+<p class="font-body-md text-body-md text-secondary">Predictive On</p>
+</div>
+<div class="space-y-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">SYNC</p>
+<p class="font-body-md text-body-md">2m ago</p>
+</div>
+<div class="space-y-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">VAULT</p>
+<p class="font-body-md text-body-md text-error">Rebalancing Required</p>
+</div>
+</div>
+</details>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container-lowest/60 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center pt-3 pb-8 px-6 shadow-2xl rounded-t-lg">
+<a class="flex flex-col items-center justify-center text-secondary gap-1 transition-all duration-300 ease-out hover:text-on-surface" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard_customize</span>
+<span class="font-label-sm text-label-sm uppercase">Brief</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 transition-all duration-300 ease-out hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span class="font-label-sm text-label-sm uppercase">Wealth</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 transition-all duration-300 ease-out hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">swap_calls</span>
+<span class="font-label-sm text-label-sm uppercase">Flow</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 transition-all duration-300 ease-out hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">lock</span>
+<span class="font-label-sm text-label-sm uppercase">Vault</span>
+</a>
+</nav>
+<script>
+        // Micro-interaction for cards
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-4px)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+    </script>
+</body></html>

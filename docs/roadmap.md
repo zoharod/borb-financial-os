@@ -1,4 +1,4 @@
-# roadmap.md — Household Finance OS
+# roadmap.md — Borb Financial OS
 
 > Roadmap dinámico. Se actualiza a medida que se completan fases. Estado detallado turno-a-turno vive en `project_state.md`; aquí vive la vista de planificación.
 

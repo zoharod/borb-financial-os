@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --glass-bg: rgba(11, 19, 38, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.05);
+        }
+        body {
+            background-color: #0b1326;
+            color: #dae2fd;
+            font-family: 'Outfit', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+        }
+        .sunken-field {
+            background: rgba(6, 14, 32, 0.5);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.02);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        @keyframes flow {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .shimmer {
+            position: relative;
+            overflow: hidden;
+        }
+        .shimmer::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(78, 222, 163, 0.05), transparent);
+            animation: flow 3s infinite;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "surface-dim": "#0b1326",
+                "on-tertiary-fixed": "#301400",
+                "on-primary-container": "#ede0ff",
+                "surface-container-low": "#131b2e",
+                "inverse-on-surface": "#283044",
+                "surface-container-highest": "#2d3449",
+                "secondary-container": "#00a572",
+                "on-primary-fixed-variant": "#5a00c6",
+                "outline-variant": "#4a4455",
+                "surface-bright": "#31394d",
+                "surface": "#0b1326",
+                "on-secondary-container": "#00311f",
+                "surface-container-lowest": "#060e20",
+                "on-secondary-fixed": "#002113",
+                "on-tertiary": "#4f2500",
+                "on-error-container": "#ffdad6",
+                "tertiary-fixed-dim": "#ffb784",
+                "tertiary": "#ffb784",
+                "tertiary-container": "#a15100",
+                "inverse-primary": "#732ee4",
+                "on-tertiary-container": "#ffe0cd",
+                "secondary-fixed-dim": "#4edea3",
+                "error": "#ffb4ab",
+                "surface-container-high": "#222a3d",
+                "on-secondary": "#003824",
+                "on-primary": "#3f008e",
+                "primary-container": "#7c3aed",
+                "error-container": "#93000a",
+                "on-tertiary-fixed-variant": "#713700",
+                "on-error": "#690005",
+                "secondary": "#4edea3",
+                "on-surface": "#dae2fd",
+                "on-primary-fixed": "#25005a",
+                "on-surface-variant": "#ccc3d8",
+                "secondary-fixed": "#6ffbbe",
+                "surface-variant": "#2d3449",
+                "on-background": "#dae2fd",
+                "primary-fixed-dim": "#d2bbff",
+                "surface-container": "#171f33",
+                "primary": "#d2bbff",
+                "on-secondary-fixed-variant": "#005236",
+                "surface-tint": "#d2bbff",
+                "primary-fixed": "#eaddff",
+                "tertiary-fixed": "#ffdcc6",
+                "inverse-surface": "#dae2fd",
+                "background": "#0b1326",
+                "outline": "#958da1"
+            },
+            "borderRadius": {
+                "DEFAULT": "1rem",
+                "lg": "2rem",
+                "xl": "3rem",
+                "full": "9999px"
+            },
+            "spacing": {
+                "xl": "64px",
+                "margin-mobile": "16px",
+                "lg": "40px",
+                "md": "24px",
+                "sm": "12px",
+                "xs": "4px",
+                "base": "8px",
+                "margin-desktop": "48px",
+                "gutter": "24px"
+            },
+            "fontFamily": {
+                "headline-md": ["Outfit"],
+                "display-lg": ["Outfit"],
+                "display-lg-mobile": ["Outfit"],
+                "body-lg": ["Outfit"],
+                "label-md": ["Outfit"],
+                "label-sm": ["Outfit"],
+                "headline-lg": ["Outfit"],
+                "body-md": ["Outfit"]
+            },
+            "fontSize": {
+                "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "display-lg-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-24">
+<!-- Top Navigation Bar -->
+<header class="bg-background/80 backdrop-blur-xl text-primary font-headline-md fixed top-0 w-full border-b border-white/5 z-40">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop h-16 max-w-[1280px] mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<img alt="Profile" class="w-full h-full rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByN1kLe3KEyCOdboTDaW0Bt1aeeZWbgqjbjKwBdrDfWPF_z_gwcisWaX2uEruYWs5lWykHfhNVPrGk1gMKlCPV3QDwNfER3TUrPdi1sCLYg1A25SIFT9Af7tszCHyMTGRHQUkMfJO4LmWaG5bV8i5g_A6eeMevdKYV54f5p5jwSTou0DX8QJV8gxq0MNpNoZKJTKWRWK5HHYuIlV7U8jX7bvNmANd7XMcM9TPdZI87nIEY7kK09IIFRQ"/>
+</div>
+<span class="font-label-sm text-label-sm tracking-widest text-primary uppercase">FINANCE OS</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="hover:opacity-80 transition-opacity scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+</div>
+</header>
+<main class="pt-24 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
+<!-- Net Worth Hero Section -->
+<section class="mb-lg">
+<div class="glass-card rounded-lg p-gutter md:p-8 flex flex-col md:flex-row items-end justify-between gap-gutter">
+<div>
+<h2 class="font-label-sm text-label-sm text-on-surface-variant mb-2 uppercase">AGGREGATE NET WORTH</h2>
+<div class="flex items-baseline gap-4">
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-background">L1,450,000</h1>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+                        +4.2%
+                    </span>
+</div>
+</div>
+<div class="w-full md:w-64 h-16">
+<!-- Sparkline Placeholder -->
+<svg class="w-full h-full" viewbox="0 0 200 50">
+<path d="M0,45 Q20,40 40,42 T80,30 T120,35 T160,15 T200,5" fill="none" stroke="#4edea3" stroke-linecap="round" stroke-width="3"></path>
+<path d="M0,45 Q20,40 40,42 T80,30 T120,35 T160,15 T200,5 V50 H0 Z" fill="url(#grad)" opacity="0.2"></path>
+<defs>
+<lineargradient id="grad" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:#4edea3;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#4edea3;stop-opacity:0"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+</div>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Accounts: List of Linked Banks (Span 7) -->
+<section class="md:col-span-7 flex flex-col gap-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant px-2 uppercase">LINKED ACCOUNTS</h3>
+<div class="glass-card rounded-lg divide-y divide-white/5 overflow-hidden">
+<!-- Chase -->
+<div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">account_balance</span>
+</div>
+<div>
+<p class="font-body-lg text-on-background font-medium">Chase Checking</p>
+<p class="text-[12px] text-on-surface-variant font-label-sm uppercase">Last Sync: 2m ago</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline-md text-on-background">L24,850.00</p>
+<p class="text-[12px] text-secondary font-label-sm">STABLE</p>
+</div>
+</div>
+<!-- Amex -->
+<div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">credit_card</span>
+</div>
+<div>
+<p class="font-body-lg text-on-background font-medium">Amex Platinum</p>
+<p class="text-[12px] text-on-surface-variant font-label-sm uppercase">Last Sync: 1h ago</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline-md text-on-background">-L12,400.00</p>
+<p class="text-[12px] text-error font-label-sm">PENDING</p>
+</div>
+</div>
+<!-- Fidelity -->
+<div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors cursor-pointer group">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">monitoring</span>
+</div>
+<div>
+<p class="font-body-lg text-on-background font-medium">Fidelity Brokerage</p>
+<p class="text-[12px] text-on-surface-variant font-label-sm uppercase">Last Sync: 5h ago</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-headline-md text-on-background">L842,000.00</p>
+<p class="text-[12px] text-secondary font-label-sm">ACTIVE</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Savings & Goals: Circular Progress (Span 5) -->
+<section class="md:col-span-5 flex flex-col gap-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant px-2 uppercase">SAVINGS &amp; GOALS</h3>
+<div class="glass-card rounded-lg p-8 flex flex-col gap-10">
+<!-- House Fund -->
+<div class="flex items-center gap-6">
+<div class="relative w-20 h-20">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-white/10" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-secondary" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-dasharray="213.6" stroke-dashoffset="74.7" stroke-width="6"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-label-md font-label-md">65%</span>
+</div>
+</div>
+<div>
+<p class="font-body-lg text-on-background font-semibold">House Fund</p>
+<p class="text-on-surface-variant text-body-md">L325,000 / L500,000</p>
+</div>
+</div>
+<!-- Retirement -->
+<div class="flex items-center gap-6">
+<div class="relative w-20 h-20">
+<svg class="w-full h-full transform -rotate-90">
+<circle class="text-white/10" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-width="6"></circle>
+<circle class="text-tertiary" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" stroke-dasharray="213.6" stroke-dashoffset="149.5" stroke-width="6"></circle>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-label-md font-label-md">30%</span>
+</div>
+</div>
+<div>
+<p class="font-body-lg text-on-background font-semibold">Retirement</p>
+<p class="text-on-surface-variant text-body-md">L210,000 / L700,000</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Debt Section -->
+<section class="md:col-span-12 flex flex-col gap-4">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant px-2 uppercase">DEBT &amp; UTILIZATION</h3>
+<div class="glass-card rounded-lg p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-12 items-center">
+<div class="flex flex-col gap-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">TOTAL DEBT</p>
+<p class="font-headline-md text-on-background">L18,420.00</p>
+<p class="text-error font-body-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+                        High utilization alert
+                    </p>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase">Utilization</p>
+<p class="font-headline-md text-on-background">38%</p>
+</div>
+<div class="h-3 w-full sunken-field rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[38%] rounded-full shadow-[0_0_12px_rgba(78,222,163,0.4)]"></div>
+</div>
+</div>
+<div class="flex flex-col gap-6">
+<div class="sunken-field rounded-lg p-4 flex justify-between items-center">
+<span class="text-on-surface-variant font-label-sm uppercase">CREDIT LIMIT</span>
+<span class="font-headline-md text-on-background text-[20px]">L45,000</span>
+</div>
+<div class="sunken-field rounded-lg p-4 flex justify-between items-center">
+<span class="text-on-surface-variant font-label-sm uppercase">REMAINING</span>
+<span class="font-headline-md text-secondary text-[20px]">L26,580</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Extra: Interactive Floating Action -->
+<div class="fixed bottom-24 right-8 z-50">
+<button class="bg-secondary text-on-secondary w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</main>
+<!-- Navigation Shell (Bottom Bar) -->
+<nav class="bg-surface-container-lowest/60 backdrop-blur-2xl fixed bottom-0 left-0 w-full z-50 flex justify-around items-center pt-3 pb-8 px-6 border-t border-white/5 rounded-t-lg shadow-2xl">
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">dashboard_customize</span>
+<span class="font-label-sm text-label-sm">Brief</span>
+</a>
+<a class="flex flex-col items-center justify-center text-secondary gap-1 hover:text-on-surface transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+<span class="font-label-sm text-label-sm">Wealth</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">swap_calls</span>
+<span class="font-label-sm text-label-sm">Flow</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out" href="#">
+<span class="material-symbols-outlined">lock</span>
+<span class="font-label-sm text-label-sm">Vault</span>
+</a>
+</nav>
+<script>
+    // Micro-interactions for glass cards
+    document.querySelectorAll('.glass-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            card.style.setProperty('--mouse-x', `${x}px`);
+            card.style.setProperty('--mouse-y', `${y}px`);
+            card.style.background = `radial-gradient(600px circle at ${x}px ${y}px, rgba(255,255,255,0.03), transparent 40%), var(--glass-bg)`;
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.background = `var(--glass-bg)`;
+        });
+    });
+</script>
+</body></html>

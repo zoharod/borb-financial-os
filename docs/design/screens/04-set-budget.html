@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Set Budget - Finance OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-bright": "#31394d",
+                    "on-primary-fixed-variant": "#5a00c6",
+                    "primary-fixed": "#eaddff",
+                    "tertiary-container": "#a15100",
+                    "on-tertiary-fixed-variant": "#713700",
+                    "inverse-primary": "#732ee4",
+                    "outline": "#958da1",
+                    "surface-container-lowest": "#060e20",
+                    "secondary-fixed-dim": "#4edea3",
+                    "on-tertiary": "#4f2500",
+                    "on-primary-container": "#ede0ff",
+                    "background": "#0b1326",
+                    "primary-container": "#7c3aed",
+                    "surface-container-low": "#131b2e",
+                    "surface-container-high": "#222a3d",
+                    "on-surface-variant": "#ccc3d8",
+                    "on-tertiary-fixed": "#301400",
+                    "secondary-fixed": "#6ffbbe",
+                    "on-secondary-container": "#00311f",
+                    "on-secondary": "#003824",
+                    "surface-variant": "#2d3449",
+                    "on-background": "#dae2fd",
+                    "surface-dim": "#0b1326",
+                    "on-secondary-fixed-variant": "#005236",
+                    "on-primary": "#3f008e",
+                    "primary": "#d2bbff",
+                    "tertiary-fixed": "#ffdcc6",
+                    "surface-tint": "#d2bbff",
+                    "surface-container": "#171f33",
+                    "secondary-container": "#00a572",
+                    "outline-variant": "#4a4455",
+                    "primary-fixed-dim": "#d2bbff",
+                    "surface-container-highest": "#2d3449",
+                    "tertiary": "#ffb784",
+                    "surface": "#0b1326",
+                    "error-container": "#93000a",
+                    "on-surface": "#dae2fd",
+                    "error": "#ffb4ab",
+                    "tertiary-fixed-dim": "#ffb784",
+                    "on-primary-fixed": "#25005a",
+                    "on-error": "#690005",
+                    "inverse-on-surface": "#283044",
+                    "inverse-surface": "#dae2fd",
+                    "secondary": "#4edea3",
+                    "on-tertiary-container": "#ffe0cd",
+                    "on-secondary-fixed": "#002113",
+                    "on-error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "md": "24px",
+                    "margin-desktop": "48px",
+                    "xl": "64px",
+                    "xs": "4px",
+                    "base": "8px",
+                    "sm": "12px",
+                    "margin-mobile": "16px",
+                    "lg": "40px",
+                    "gutter": "24px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Outfit"],
+                    "label-md": ["Outfit"],
+                    "headline-lg": ["Outfit"],
+                    "display-lg": ["Outfit"],
+                    "body-lg": ["Outfit"],
+                    "body-md": ["Outfit"],
+                    "headline-md": ["Outfit"],
+                    "display-lg-mobile": ["Outfit"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "display-lg-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Outfit', sans-serif; background-color: #0b1326; color: #dae2fd; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .lumina-glow { box-shadow: 0 0 20px rgba(210, 187, 255, 0.15); }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .active-period { background-color: #00a572; color: #002113; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background min-h-screen pb-32">
+<!-- TopAppBar -->
+<header class="bg-background/80 backdrop-blur-xl border-b border-white/5 fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A sophisticated 3D rendered avatar of a professional couple in a high-tech minimalist style. The lighting is soft and atmospheric with purple and teal hues reflecting off polished surfaces. The characters look modern, wearing smart-casual clothing against a deep slate background, symbolizing collaborative financial planning." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBM_AjUGpfTfY6Nz7AxRCZedKzP9vrcIyk4sl_5VQjkGCaR4rsnORPvVdQu4Hflg_wzVkCMNa4UU75xOxr-lfBr3sdjIoJOD4EEeY8btgyxLQ4rIX8y_nSRyaCtodLrTBF4m8m2jq_ZftRp11B0iivCmF_oLltol7ZKnblPpB5pouJiMi7JpfNPF54Hyy6uJwkiOVB4NZIxegctGBdOIdJa3EBjIaw4kGyuWDf59h0jzSeYxwe5aiP4-w"/>
+</div>
+<span class="font-label-caps text-label-caps tracking-widest text-primary">FINANCE OS</span>
+</div>
+<button class="material-symbols-outlined text-primary hover:opacity-80 transition-opacity">search</button>
+</header>
+<main class="pt-24 px-6 max-w-2xl mx-auto">
+<!-- Headline -->
+<div class="mb-8">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background">Set Budget</h1>
+<p class="font-body-md text-on-surface-variant mt-2">Allocate your funds to stay on track with your financial goals.</p>
+</div>
+<div class="space-y-8">
+<!-- Amount Input -->
+<div class="flex flex-col items-center py-6">
+<div class="relative group">
+<span class="absolute left-0 top-1/2 -translate-y-1/2 font-display-lg text-primary/50">$</span>
+<input class="bg-transparent border-none text-center font-display-lg text-display-lg-mobile md:text-display-lg w-full focus:ring-0 text-on-background placeholder:text-surface-variant transition-all" placeholder="0.00" type="number" value="450.00"/>
+</div>
+<div class="h-px w-32 bg-gradient-to-r from-transparent via-primary/30 to-transparent mt-2"></div>
+</div>
+<!-- Period Selector -->
+<div class="flex justify-center">
+<div class="inline-flex p-1 bg-surface-container rounded-full border border-white/5">
+<button class="px-6 py-2 rounded-full font-label-md active-period transition-all duration-300" id="monthly">Monthly</button>
+<button class="px-6 py-2 rounded-full font-label-md text-on-surface-variant hover:text-on-surface transition-all duration-300" id="weekly">Weekly</button>
+</div>
+</div>
+<!-- Category Selector (Horizontal Scroll) -->
+<div class="space-y-3">
+<label class="font-label-md text-on-surface-variant uppercase tracking-wider ml-2">Category</label>
+<div class="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+<div class="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center border-2 border-primary lumina-glow transition-all">
+<span class="material-symbols-outlined text-primary">shopping_cart</span>
+</div>
+<span class="font-label-sm text-on-surface">Groceries</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer opacity-60 hover:opacity-100 transition-all">
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-on-surface-variant">movie</span>
+</div>
+<span class="font-label-sm text-on-surface-variant">Entertain</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer opacity-60 hover:opacity-100 transition-all">
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-on-surface-variant">directions_car</span>
+</div>
+<span class="font-label-sm text-on-surface-variant">Transport</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer opacity-60 hover:opacity-100 transition-all">
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-on-surface-variant">restaurant</span>
+</div>
+<span class="font-label-sm text-on-surface-variant">Dining</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2 group cursor-pointer opacity-60 hover:opacity-100 transition-all">
+<div class="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center border border-white/10">
+<span class="material-symbols-outlined text-on-surface-variant">add</span>
+</div>
+<span class="font-label-sm text-on-surface-variant">Other</span>
+</div>
+</div>
+</div>
+<!-- Projected Impact Card -->
+<div class="glass-card rounded-lg p-6 relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-secondary/10 blur-3xl -mr-16 -mt-16 rounded-full"></div>
+<h3 class="font-label-md text-secondary uppercase tracking-widest mb-4">Projected Impact</h3>
+<div class="flex items-end justify-between gap-4">
+<div class="space-y-1">
+<span class="text-on-surface-variant font-label-sm">Estimated Month-End Saving</span>
+<div class="font-headline-md text-on-surface">+$214.50</div>
+</div>
+<div class="flex-1 max-w-[120px]">
+<div class="h-2 w-full bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-3/4 rounded-full"></div>
+</div>
+<span class="font-label-sm text-secondary text-right block mt-1">75% of goal</span>
+</div>
+</div>
+<p class="font-body-md text-on-surface-variant mt-4 text-sm leading-relaxed">
+                    Setting this budget will increase your potential savings by <span class="text-secondary font-bold">12%</span> compared to last month.
+                </p>
+</div>
+<!-- Actions -->
+<div class="flex flex-col gap-3 pt-4">
+<button class="w-full py-4 bg-primary text-on-primary font-label-md rounded-full shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all lumina-glow">
+                    Set Budget
+                </button>
+<button class="w-full py-4 text-on-surface-variant font-label-md rounded-full hover:bg-surface-variant/30 transition-all">
+                    Cancel
+                </button>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 bg-surface-container-lowest/60 backdrop-blur-2xl border-t border-white/5 rounded-t-lg flex justify-around items-center pt-3 pb-8 px-6 shadow-2xl">
+<button class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">dashboard_customize</span>
+<span class="font-label-caps text-label-caps">Brief</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary gap-1 transition-all duration-300 ease-out">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+<span class="font-label-caps text-label-caps">Wealth</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">swap_calls</span>
+<span class="font-label-caps text-label-caps">Flow</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant gap-1 hover:text-on-surface transition-all duration-300 ease-out">
+<span class="material-symbols-outlined">lock</span>
+<span class="font-label-caps text-label-caps">Vault</span>
+</button>
+</nav>
+<script>
+        // Micro-interactions for toggles
+        const monthlyBtn = document.getElementById('monthly');
+        const weeklyBtn = document.getElementById('weekly');
+
+        monthlyBtn.addEventListener('click', () => {
+            monthlyBtn.classList.add('active-period');
+            monthlyBtn.classList.remove('text-on-surface-variant');
+            weeklyBtn.classList.remove('active-period');
+            weeklyBtn.classList.add('text-on-surface-variant');
+        });
+
+        weeklyBtn.addEventListener('click', () => {
+            weeklyBtn.classList.add('active-period');
+            weeklyBtn.classList.remove('text-on-surface-variant');
+            monthlyBtn.classList.remove('active-period');
+            monthlyBtn.classList.add('text-on-surface-variant');
+        });
+
+        // Simple scale effect on interaction
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('mousedown', () => btn.classList.add('scale-95'));
+            btn.addEventListener('mouseup', () => btn.classList.remove('scale-95'));
+            btn.addEventListener('mouseleave', () => btn.classList.remove('scale-95'));
+        });
+    </script>
+</body></html>

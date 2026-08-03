@@ -1,0 +1,318 @@
+<!DOCTYPE html><html class="dark" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Finance OS | Command Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-dim": "#0b1326",
+                    "on-tertiary-fixed": "#301400",
+                    "on-primary-container": "#ede0ff",
+                    "surface-container-low": "#131b2e",
+                    "inverse-on-surface": "#283044",
+                    "surface-container-highest": "#2d3449",
+                    "secondary-container": "#00a572",
+                    "on-primary-fixed-variant": "#5a00c6",
+                    "outline-variant": "#4a4455",
+                    "surface-bright": "#31394d",
+                    "surface": "#0b1326",
+                    "on-secondary-container": "#00311f",
+                    "surface-container-lowest": "#060e20",
+                    "on-secondary-fixed": "#002113",
+                    "on-tertiary": "#4f2500",
+                    "on-error-container": "#ffdad6",
+                    "tertiary-fixed-dim": "#ffb784",
+                    "tertiary": "#ffb784",
+                    "tertiary-container": "#a15100",
+                    "inverse-primary": "#732ee4",
+                    "on-tertiary-container": "#ffe0cd",
+                    "secondary-fixed-dim": "#4edea3",
+                    "error": "#ffb4ab",
+                    "surface-container-high": "#222a3d",
+                    "on-secondary": "#003824",
+                    "on-primary": "#3f008e",
+                    "primary-container": "#7c3aed",
+                    "error-container": "#93000a",
+                    "on-tertiary-fixed-variant": "#713700",
+                    "on-error": "#690005",
+                    "secondary": "#4edea3",
+                    "on-surface": "#dae2fd",
+                    "on-primary-fixed": "#25005a",
+                    "on-surface-variant": "#ccc3d8",
+                    "secondary-fixed": "#6ffbbe",
+                    "surface-variant": "#2d3449",
+                    "on-background": "#dae2fd",
+                    "primary-fixed-dim": "#d2bbff",
+                    "surface-container": "#171f33",
+                    "primary": "#d2bbff",
+                    "on-secondary-fixed-variant": "#005236",
+                    "surface-tint": "#d2bbff",
+                    "primary-fixed": "#eaddff",
+                    "tertiary-fixed": "#ffdcc6",
+                    "inverse-surface": "#dae2fd",
+                    "background": "#0b1326",
+                    "outline": "#958da1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xl": "64px",
+                    "margin-mobile": "16px",
+                    "lg": "40px",
+                    "md": "24px",
+                    "sm": "12px",
+                    "xs": "4px",
+                    "base": "8px",
+                    "margin-desktop": "48px",
+                    "gutter": "24px",
+                    "section-gap": "48px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Outfit"],
+                    "display-lg": ["Outfit"],
+                    "display-lg-mobile": ["Outfit"],
+                    "body-lg": ["Outfit"],
+                    "label-md": ["Outfit"],
+                    "label-sm": ["Outfit"],
+                    "headline-lg": ["Outfit"],
+                    "body-md": ["Outfit"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "display-lg-mobile": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(11, 19, 38, 0.7);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .sunken-input {
+            box-shadow: inset 0px 2px 4px rgba(0,0,0,0.4);
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .keyboard-key {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border-bottom: 2px solid rgba(0,0,0,0.3);
+            transition: all 0.1s ease;
+        }
+        .keyboard-key:active {
+            transform: translateY(2px);
+            background: rgba(255, 255, 255, 0.15);
+            border-bottom: 0px solid transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        body {
+            min-height: max(884px, 100dvh);
+            font-family: 'Outfit', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen overflow-hidden flex flex-col">
+<!-- Command Center Overlay Content -->
+<main class="flex-1 flex flex-col w-full max-w-4xl mx-auto px-margin-mobile md:px-margin-desktop pt-12 pb-4 overflow-y-auto">
+<!-- Header: Search Input -->
+<header class="w-full mb-10 animate-fade-in" style="animation-delay: 0.1s;"><div class="relative group">
+  <div class="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex items-center pointer-events-none">
+    <span class="material-symbols-outlined text-2xl text-secondary">search</span>
+  </div>
+  <input autofocus="" class="w-full h-14 pl-12 pr-6 rounded-lg bg-surface-container-high border border-outline-variant/30 text-on-surface font-body-lg focus:ring-2 focus:ring-secondary/30 transition-all placeholder:text-on-surface-variant" placeholder="Ask anything... (e.g., &quot;Pay my Visa&quot;, &quot;How much on food?&quot;)" type="text">
+</div></header>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter flex-1">
+<!-- Left Column: Recent Queries & Suggestions -->
+<div class="space-y-section-gap">
+<!-- Recent Queries -->
+<section class="animate-fade-in" style="animation-delay: 0.2s;">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant mb-4 flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm">history</span>
+                        Recent Queries
+                    </h3>
+<div class="space-y-3">
+<button class="w-full text-left p-4 rounded-DEFAULT glass-panel hover:bg-surface-container-highest transition-colors flex items-center justify-between group">
+<span class="font-body-md text-body-md">Show Apple purchases</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-secondary opacity-0 group-hover:opacity-100 transition-all">arrow_forward_ios</span>
+</button>
+<button class="w-full text-left p-4 rounded-DEFAULT glass-panel hover:bg-surface-container-highest transition-colors flex items-center justify-between group">
+<span class="font-body-md text-body-md">Subscriptions</span>
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-secondary opacity-0 group-hover:opacity-100 transition-all">arrow_forward_ios</span>
+</button>
+</div>
+</section>
+<!-- AI Suggestions -->
+<section class="animate-fade-in" style="animation-delay: 0.3s;">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant mb-4 flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm">psychology</span>
+                        AI Suggestions
+                    </h3>
+<div class="space-y-3">
+<div class="p-4 rounded-DEFAULT glass-panel border-l-4 border-secondary flex gap-4">
+<span class="material-symbols-outlined text-secondary">redeem</span>
+<div class="flex-1">
+<p class="font-body-md text-body-md mb-1">Check cashback availability</p>
+<p class="text-label-sm text-on-surface-variant">You have $42.50 pending from recent grocery trips.</p>
+</div>
+</div>
+<div class="p-4 rounded-DEFAULT glass-panel border-l-4 border-error flex gap-4">
+<span class="material-symbols-outlined text-error">trending_up</span>
+<div class="flex-1">
+<p class="font-body-md text-body-md mb-1">Review over-budget categories</p>
+<p class="text-label-sm text-on-surface-variant">Dining out is 15% above your monthly target.</p>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Quick Actions & Contextual Card -->
+<div class="space-y-section-gap">
+<!-- Quick Actions -->
+<section class="animate-fade-in" style="animation-delay: 0.4s;">
+<h3 class="font-label-sm text-label-sm text-on-surface-variant mb-4 flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm">bolt</span>
+                        Quick Actions
+                    </h3>
+<div class="grid grid-cols-1 gap-3">
+<button class="flex items-center gap-4 p-4 rounded-DEFAULT bg-secondary text-on-secondary hover:brightness-110 transition-all">
+<span class="material-symbols-outlined">add_circle</span>
+<span class="font-label-md text-label-md uppercase tracking-wide">Add Transaction</span>
+</button>
+<button class="flex items-center gap-4 p-4 rounded-DEFAULT glass-panel border-secondary/20 hover:border-secondary/50 transition-all">
+<span class="material-symbols-outlined text-secondary">sync_alt</span>
+<span class="font-label-md text-label-md uppercase tracking-wide">Transfer Funds</span>
+</button>
+<button class="flex items-center gap-4 p-4 rounded-DEFAULT glass-panel border-secondary/20 hover:border-secondary/50 transition-all">
+<span class="material-symbols-outlined text-secondary">track_changes</span>
+<span class="font-label-md text-label-md uppercase tracking-wide">Manage Goals</span>
+</button>
+</div>
+</section>
+<!-- Data Visual Hint (Contextual) -->
+<section class="animate-fade-in h-40 hidden md:block" style="animation-delay: 0.5s;">
+<div class="w-full h-full rounded-lg glass-panel relative overflow-hidden p-6 flex flex-col justify-between">
+<div class="relative z-10 flex justify-between items-start">
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">CASH FLOW INDEX</div>
+<div class="text-secondary font-headline-md">94%</div>
+</div>
+<div class="relative z-10 flex flex-col">
+<div class="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[94%]"></div>
+</div>
+<p class="text-label-sm text-on-surface-variant mt-2">Optimal liquidity maintained across all vaults.</p>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+<!-- Mocked Integrated Keyboard View -->
+<footer class="w-full glass-panel pt-4 pb-8 px-4 mt-auto animate-fade-in translate-y-4" style="animation-delay: 0.6s;">
+<div class="max-w-3xl mx-auto flex flex-col gap-2">
+<!-- Row 1 -->
+<div class="flex justify-center gap-1.5 h-12">
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">Q</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">W</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">E</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">R</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">T</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">Y</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">U</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">I</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">O</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">P</div>
+</div>
+<!-- Row 2 -->
+<div class="flex justify-center gap-1.5 h-12 px-4">
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">A</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">S</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">D</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">F</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">G</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">H</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">J</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">K</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">L</div>
+</div>
+<!-- Row 3 -->
+<div class="flex justify-center gap-1.5 h-12">
+<div class="keyboard-key w-16 rounded-DEFAULT flex items-center justify-center font-body-md">
+<span class="material-symbols-outlined text-lg">shift</span>
+</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">Z</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">X</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">C</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">V</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">B</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">N</div>
+<div class="keyboard-key flex-1 rounded-DEFAULT flex items-center justify-center font-body-md">M</div>
+<div class="keyboard-key w-16 rounded-DEFAULT flex items-center justify-center font-body-md">
+<span class="material-symbols-outlined text-lg">backspace</span>
+</div>
+</div>
+<!-- Row 4 -->
+<div class="flex justify-center gap-1.5 h-12">
+<div class="keyboard-key w-20 rounded-DEFAULT flex items-center justify-center font-label-sm">123</div>
+<div class="keyboard-key w-12 rounded-DEFAULT flex items-center justify-center"><span class="material-symbols-outlined">emoji_emotions</span></div>
+<div class="keyboard-key w-12 rounded-DEFAULT flex items-center justify-center"><span class="material-symbols-outlined">mic</span></div>
+<div class="keyboard-key flex-[4] rounded-DEFAULT flex items-center justify-center font-body-md text-on-surface-variant/40">space</div>
+<div class="keyboard-key flex-1 bg-secondary text-on-secondary rounded-DEFAULT flex items-center justify-center font-label-md">GO</div>
+</div>
+</div>
+</footer>
+<!-- Atmosphere Effects -->
+<div class="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
+<div class="absolute top-[-10%] right-[-10%] w-[60%] h-[60%] bg-secondary/5 blur-[120px] rounded-full"></div>
+<div class="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] bg-surface-container-highest/20 blur-[120px] rounded-full"></div>
+</div>
+<script>
+        // Simple micro-interaction for input field
+        const input = document.querySelector('input');
+        input.addEventListener('focus', () => {
+            input.parentElement.classList.add('scale-[1.01]');
+        });
+        input.addEventListener('blur', () => {
+            input.parentElement.classList.remove('scale-[1.01]');
+        });
+
+        // Close Command Center with Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                console.log('Closing Command Center');
+                document.body.style.opacity = '0.5';
+                setTimeout(() => document.body.style.opacity = '1', 200);
+            }
+        });
+    </script>
+
+
+</body></html>

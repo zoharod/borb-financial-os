@@ -1,6 +1,6 @@
 # CLAUDE.md — Instrucciones para Claude Code en este repo
 
-Este proyecto es **Household Finance OS**, una app de finanzas personales para un hogar de 2 personas. Este archivo son las reglas de trabajo para cualquier sesión de Claude Code en este repo.
+Este proyecto es **Borb Financial OS**, una app de finanzas personales para un hogar de 2 personas. Este archivo son las reglas de trabajo para cualquier sesión de Claude Code en este repo.
 
 ## Regla de oro
 

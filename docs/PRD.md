@@ -1,4 +1,4 @@
-# PRD — Sistema Financiero Personal (Household Finance OS)
+# PRD — Sistema Financiero Personal (Borb Financial OS)
 
 **Versión:** 1.0 — Aprobado
 **Última actualización:** 2026-08-02

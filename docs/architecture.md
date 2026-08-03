@@ -1,4 +1,4 @@
-# architecture.md — Household Finance OS
+# architecture.md — Borb Financial OS
 
 > Fuente técnica de verdad. Basado en PRD.md v1.0 y TDR.md v1.0 (aprobados). Cualquier cambio de arquitectura debe reflejarse aquí antes de implementarse.
 
