@@ -12,13 +12,13 @@ Optimizar → Proyectar → Presentar → Alertar → Automatizar → Aprender �
 ---
 
 ## Fase 0 — Setup del proyecto
-**Estado: casi completa — falta solo el deploy a Vercel**
+**Estado: ✅ completa**
 
 - [x] Inicializar repo Next.js + TypeScript + Tailwind.
 - [x] Crear proyecto Supabase, configurar variables de entorno.
 - [x] Crear schema inicial (`households`, `household_members`, `accounts`, `categories`, `budgets`, `transactions`) con RLS.
 - [x] Configurar Supabase Auth (email/password).
-- [ ] Deploy inicial a Vercel (esqueleto, "Hello World" autenticado).
+- [x] Deploy inicial a Vercel (esqueleto, "Hello World" autenticado) — https://borb-financial-os.vercel.app, conectado a GitHub (`zoharod/borb-financial-os`, rama `main`) para deploys automáticos.
 
 **Criterio de salida:** login funciona, RLS probado con 2 hogares de prueba que NO se ven datos entre sí. **✅ Cumplido** — probado en navegador con `test-a@borb.test` / `test-b@borb.test` (ver `project_state.md`). Detalle técnico del bug de RLS encontrado y su fix en `architecture.md` ("Multi-tenancy").
 

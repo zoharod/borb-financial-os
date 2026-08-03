@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-03
-**Fase actual:** Fase 0 — Setup del proyecto (en progreso, falta deploy a Vercel)
+**Fase actual:** Fase 0 completa ✅ — lista para arrancar Fase 1
 
 ---
 
@@ -25,16 +25,19 @@
 - [x] **Bug de RLS encontrado y corregido:** la policy de `household_members` usaba una subquery contra sí misma sin caso base → Postgres tiraba "infinite recursion detected in policy". Fix: función `public.user_household_ids()` `SECURITY DEFINER` (ver migraciones `20260803011339` y `20260803011546`). Todas las policies multi-tenant ahora pasan por esa función.
 - [x] Tipos TypeScript generados desde el schema real (`types/supabase.ts`, reemplaza el placeholder).
 - [x] Login con Supabase Auth probado end-to-end en navegador con 2 usuarios/households de prueba (`test-a@borb.test` → Casa Test A, `test-b@borb.test` → Casa Test B): cada uno ve únicamente su propio household. **Criterio de salida de Fase 0 cumplido** (login funciona, RLS aísla correctamente).
+- [x] Repo subido a GitHub: [zoharod/borb-financial-os](https://github.com/zoharod/borb-financial-os) (privado).
+- [x] Proyecto Vercel creado (`borb-a59f/borb-financial-os`) y conectado al repo de GitHub (rama `main` = producción, deploys automáticos en cada push).
+- [x] Env vars de Supabase cargadas en Vercel (production/preview/development).
+- [x] **Deploy inicial verificado en producción:** https://borb-financial-os.vercel.app — login + aislamiento de RLS probados ahí también con los mismos 2 usuarios de prueba. **Fase 0 100% completa.**
 
 ## 🔄 En progreso
 
-- Deploy esqueleto a Vercel — pendiente (requiere cuenta/autorización del usuario).
+- Nada — Fase 0 cerrada. Punto de partida para arrancar Fase 1 en la próxima sesión.
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Deploy inicial a Vercel (con las env vars de `.env.local` cargadas ahí) para cerrar Fase 0 al 100%.
-2. Una vez deployado, arrancar Fase 1: CRUD de Cuentas, Categorías, Transacciones, Presupuesto, Dashboard real (ver roadmap.md).
-3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base para seguir probando RLS — borrarlos antes de invitar usuarios reales.
+1. Arrancar Fase 1: CRUD de Cuentas, Categorías, Transacciones, Presupuesto, Dashboard real (ver `roadmap.md`). Usar "Wealth Dashboard" y "Set Budget" de `docs/design/screens/` como referencia visual — no las 4 screens completas (ver nota de alcance abajo).
+2. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción) para seguir probando RLS — borrarlos antes de invitar usuarios reales.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 
