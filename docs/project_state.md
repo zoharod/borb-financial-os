@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-03
-**Fase actual:** Fase 0 completa ✅ — lista para arrancar Fase 1
+**Fase actual:** Fase 1 completa ✅ — lista para Fase 1-B o para pulir Fase 1
 
 ---
 
@@ -30,15 +30,20 @@
 - [x] Env vars de Supabase cargadas en Vercel (production/preview/development).
 - [x] **Deploy inicial verificado en producción:** https://borb-financial-os.vercel.app — login + aislamiento de RLS probados ahí también con los mismos 2 usuarios de prueba. **Fase 0 100% completa.**
 - [x] **Identidad de git corregida para este repo (local, no global):** el `user.email` global de esta máquina es la cuenta de trabajo (WeWorkRemotely), que en GitHub resuelve a una cuenta distinta sin acceso al proyecto de Vercel → Vercel bloqueaba los deploys automáticos por push con `TEAM_ACCESS_REQUIRED`. Se configuró `git config --local user.name/user.email` = `zoharod` / `zoharod@gmail.com` (coincide con la cuenta de GitHub/Vercel dueña del proyecto) **solo en este repo**, sin tocar la config global de trabajo. Los commits previos a este fix quedaron con el autor de trabajo (no se reescribió el historial); los commits nuevos ya deployan automáticamente.
+- [x] **Fase 1 completa** — CRUD de Cuentas, Categorías, Transacciones (ingreso/gasto/transferencia) y Presupuesto mensual, más Dashboard real (ingresos/gastos/ahorro/saldo por moneda + presupuesto vs. real). Componentes UI base en `components/ui/` (Button, Input, Select, Card) siguiendo el design system de Stitch. Todo probado en navegador con datos reales y verificado con RLS entre `test-a`/Casa Test A y `test-b`/Casa Test B (households completamente aislados en las 4 tablas nuevas).
+- [x] **Bug encontrado: `Map` no sobrevive la persistencia de TanStack Query a IndexedDB.** `useMonthlyActuals` devolvía un `Map`; el `PersistQueryClientProvider` (ver `lib/providers/query-provider.tsx`) serializa la cache a JSON para guardarla, y un `Map` se convierte en `{}` — al hidratar desde IndexedDB, el componente llamaba `.get()` sobre ese objeto plano y crasheaba toda la página. **Regla para código nuevo:** cualquier dato que devuelva un hook de TanStack Query debe ser JSON-safe (objetos planos/arrays/strings/numbers, nunca `Map`/`Set`/`Date` como valor de retorno de una query).
+- [x] **Bug de timezone en cálculo de fin de mes:** `new Date("YYYY-MM-01")` parsea el string como medianoche UTC; con `getFullYear()/getMonth()` (locales) en un timezone detrás de UTC (ej. America/Guatemala/Honduras, UTC-6) el mes calculado corre hacia atrás un día, invirtiendo el rango `monthStart`/`monthEnd` y devolviendo 0 resultados. Fix: construir la fecha con `new Date(year, month, day)` (argumentos numéricos, sin parseo de string) — ver `lib/hooks/use-budgets.ts`. Aplicar el mismo cuidado en cualquier cálculo de fecha futuro.
+- [x] **Limitación conocida (documentar, no bloquea Fase 1):** el saldo de cuentas trata `type='transfer'` como salida de la cuenta de origen (resta), porque el schema actual (`transactions.account_id`, sin cuenta destino) no permite saber si una fila de transferencia es el lado "entrada" o "salida". Revisar si hace falta un campo `to_account_id` o conciliación entre cuentas cuando se use `transfer` de verdad — ver `lib/hooks/use-dashboard-summary.ts`.
 
 ## 🔄 En progreso
 
-- Nada — Fase 0 cerrada. Punto de partida para arrancar Fase 1 en la próxima sesión.
+- Nada — Fase 1 cerrada.
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Arrancar Fase 1: CRUD de Cuentas, Categorías, Transacciones, Presupuesto, Dashboard real (ver `roadmap.md`). Usar "Wealth Dashboard" y "Set Budget" de `docs/design/screens/` como referencia visual — no las 4 screens completas (ver nota de alcance abajo).
-2. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción) para seguir probando RLS — borrarlos antes de invitar usuarios reales.
+1. Decidir: ¿Fase 1-B (importación CSV) o pulir Fase 1 (ej. resolver semántica de `transfer` con 2 cuentas, agregar edición inline de cuentas/categorías/transacciones que hoy solo tienen crear+eliminar, no editar)?
+2. Deploy de Fase 1 a producción (push a `main` ya dispara el deploy automático — confirmar que la Vercel corrida con las nuevas rutas funciona igual que en local).
+3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción), ahora con datos de ejemplo en Casa Test B (cuenta "Ahorro L", categoría "Comida", 2 transacciones, 1 presupuesto) — borrarlos antes de invitar usuarios reales.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 

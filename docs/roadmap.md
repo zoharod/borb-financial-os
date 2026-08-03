@@ -25,19 +25,19 @@ Optimizar → Proyectar → Presentar → Alertar → Automatizar → Aprender �
 ---
 
 ## Fase 1 — MVP (núcleo)
-**Estado: pendiente — arranca después de Fase 0**
+**Estado: ✅ completa (núcleo funcional), con 2 puntos a validar — ver notas**
 
 Activa versión simple de: Capturar, Administrar, Analizar, Presentar.
 
-- CRUD de Cuentas.
-- CRUD de Categorías (con flag `is_extra_default`).
-- Registro manual de Transacciones (ingreso/gasto/transferencia).
-- CRUD de Presupuesto mensual por categoría.
-- Dashboard: resumen del mes (ingresos/gastos/ahorro por moneda), presupuesto vs. real con barra de progreso.
-- Multi-usuario compartiendo el mismo household en tiempo real.
-- Offline simple (lectura sin conexión).
+- [x] CRUD de Cuentas.
+- [x] CRUD de Categorías (con flag `is_extra_default`).
+- [x] Registro manual de Transacciones (ingreso/gasto/transferencia). Nota: el saldo trata `transfer` como salida de la cuenta de origen — ver limitación en `project_state.md` (schema no tiene cuenta destino).
+- [x] CRUD de Presupuesto mensual por categoría.
+- [x] Dashboard: resumen del mes (ingresos/gastos/ahorro por moneda), presupuesto vs. real con barra de progreso.
+- [~] Multi-usuario compartiendo el mismo household — el modelo de datos y RLS lo soportan (household_id compartido), pero se probó aislamiento **entre** households (test-a/Casa A vs. test-b/Casa B), no 2 usuarios **dentro del mismo** household viendo los mismos datos. "En tiempo real" (updates sin refresh entre pestañas) no está implementado — no hay suscripciones de Supabase Realtime, solo refetch de TanStack Query tras cada mutación local.
+- [~] Offline simple (lectura sin conexión) — la infraestructura (TanStack Query + persistencia IndexedDB) está andando y se corrigió un bug real de serialización (ver `project_state.md`), pero no se probó explícitamente el escenario "sin conexión, ver datos cacheados".
 
-**Criterio de salida (Definition of Done ligado al PRD):** el usuario puede ver su estado real de cuentas y presupuesto sin usar el Excel, con datos correctos.
+**Criterio de salida (Definition of Done ligado al PRD):** el usuario puede ver su estado real de cuentas y presupuesto sin usar el Excel, con datos correctos. **✅ Cumplido** para un usuario por household — probado end-to-end en navegador con datos reales (cuenta, categoría, 2 transacciones, 1 presupuesto, dashboard con los montos correctos).
 
 ---
 

@@ -132,6 +132,8 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 - Escritura: requiere conexión; si no hay, se bloquea con mensaje claro (no se encola).
 - Offline completo (cola + sync + resolución de conflictos) queda **explícitamente diferido**, ver roadmap.md.
 
+**⚠️ Regla obligatoria para cualquier hook de TanStack Query (`lib/hooks/*`):** el resultado de `queryFn` debe ser JSON-safe (objetos planos, arrays, strings, numbers — nunca `Map`, `Set`, o `Date` como valor de retorno). El `PersistQueryClientProvider` (`lib/providers/query-provider.tsx`) serializa toda la cache a JSON para guardarla en IndexedDB; un `Map` se convierte silenciosamente en `{}` al guardarse, y al hidratar el componente que espera un `Map` explota en runtime (bug real encontrado en Fase 1 construyendo `use-budgets.ts` — devolvía un `Map` y crasheaba la página al recargar). Usar `Record<string, T>` en vez de `Map` para cualquier tabla de totales/agregados cacheados.
+
 ## Seguridad
 
 - RLS en todas las tablas desde el día 1 — ver patrón obligatorio en "Multi-tenancy" arriba.
