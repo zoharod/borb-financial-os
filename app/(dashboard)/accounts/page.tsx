@@ -9,6 +9,7 @@ import {
   useAccounts,
   useCreateAccount,
   useDeleteAccount,
+  useUpdateAccount,
   type Account,
 } from "@/lib/hooks/use-accounts";
 
@@ -22,7 +23,6 @@ export default function AccountsPage() {
   const { data: household } = useCurrentHousehold();
   const { data: accounts, isLoading } = useAccounts();
   const createAccount = useCreateAccount();
-  const deleteAccount = useDeleteAccount();
 
   const [name, setName] = useState("");
   const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>("HNL");
@@ -49,11 +49,6 @@ export default function AccountsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear la cuenta");
     }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar esta cuenta?")) return;
-    await deleteAccount.mutateAsync(id);
   }
 
   return (
@@ -123,24 +118,7 @@ export default function AccountsPage() {
         <ul className="space-y-3">
           {accounts.map((account: Account) => (
             <li key={account.id}>
-              <Card className="flex items-center justify-between py-4">
-                <div>
-                  <p className="text-on-surface font-medium">
-                    {account.name}
-                  </p>
-                  <p className="text-on-surface-variant text-sm font-mono">
-                    {account.currency} ·{" "}
-                    {TYPES.find((t) => t.value === account.type)?.label ??
-                      account.type}
-                  </p>
-                </div>
-                <Button
-                  variant="danger"
-                  onClick={() => handleDelete(account.id)}
-                >
-                  Eliminar
-                </Button>
-              </Card>
+              <AccountRow account={account} />
             </li>
           ))}
         </ul>
@@ -150,5 +128,112 @@ export default function AccountsPage() {
         </p>
       )}
     </div>
+  );
+}
+
+function AccountRow({ account }: { account: Account }) {
+  const updateAccount = useUpdateAccount();
+  const deleteAccount = useDeleteAccount();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(account.name);
+  const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>(
+    account.currency as (typeof CURRENCIES)[number],
+  );
+  const [type, setType] = useState<(typeof TYPES)[number]["value"]>(
+    account.type as (typeof TYPES)[number]["value"],
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    setName(account.name);
+    setCurrency(account.currency as (typeof CURRENCIES)[number]);
+    setType(account.type as (typeof TYPES)[number]["value"]);
+    setError(null);
+    setIsEditing(true);
+  }
+
+  async function handleSave() {
+    setError(null);
+    try {
+      await updateAccount.mutateAsync({ id: account.id, name, currency, type });
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar");
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("¿Eliminar esta cuenta?")) return;
+    await deleteAccount.mutateAsync(account.id);
+  }
+
+  if (isEditing) {
+    return (
+      <Card className="py-4">
+        <div className="flex flex-col gap-3">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="flex gap-3">
+            <Select
+              value={currency}
+              onChange={(e) =>
+                setCurrency(e.target.value as (typeof CURRENCIES)[number])
+              }
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={type}
+              onChange={(e) =>
+                setType(e.target.value as (typeof TYPES)[number]["value"])
+              }
+            >
+              {TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {error && (
+            <p className="text-sm text-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setIsEditing(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={updateAccount.isPending}>
+              {updateAccount.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="flex items-center justify-between py-4">
+      <div>
+        <p className="text-on-surface font-medium">{account.name}</p>
+        <p className="text-on-surface-variant text-sm font-mono">
+          {account.currency} ·{" "}
+          {TYPES.find((t) => t.value === account.type)?.label ?? account.type}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={startEditing}>
+          Editar
+        </Button>
+        <Button variant="danger" onClick={handleDelete}>
+          Eliminar
+        </Button>
+      </div>
+    </Card>
   );
 }

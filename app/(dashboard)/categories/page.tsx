@@ -9,6 +9,7 @@ import {
   useCategories,
   useCreateCategory,
   useDeleteCategory,
+  useUpdateCategory,
   type Category,
 } from "@/lib/hooks/use-categories";
 
@@ -16,7 +17,6 @@ export default function CategoriesPage() {
   const { data: household } = useCurrentHousehold();
   const { data: categories, isLoading } = useCategories();
   const createCategory = useCreateCategory();
-  const deleteCategory = useDeleteCategory();
 
   const [name, setName] = useState("");
   const [isExtraDefault, setIsExtraDefault] = useState(false);
@@ -44,11 +44,6 @@ export default function CategoriesPage() {
         err instanceof Error ? err.message : "Error al crear la categoría",
       );
     }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar esta categoría?")) return;
-    await deleteCategory.mutateAsync(id);
   }
 
   return (
@@ -97,24 +92,7 @@ export default function CategoriesPage() {
         <ul className="space-y-3">
           {categories.map((category: Category) => (
             <li key={category.id}>
-              <Card className="flex items-center justify-between py-4">
-                <div>
-                  <p className="text-on-surface font-medium">
-                    {category.name}
-                  </p>
-                  {category.is_extra_default && (
-                    <p className="text-on-surface-variant text-xs font-mono uppercase tracking-wider">
-                      Extras/Imprevistos
-                    </p>
-                  )}
-                </div>
-                <Button
-                  variant="danger"
-                  onClick={() => handleDelete(category.id)}
-                >
-                  Eliminar
-                </Button>
-              </Card>
+              <CategoryRow category={category} />
             </li>
           ))}
         </ul>
@@ -124,5 +102,95 @@ export default function CategoriesPage() {
         </p>
       )}
     </div>
+  );
+}
+
+function CategoryRow({ category }: { category: Category }) {
+  const updateCategory = useUpdateCategory();
+  const deleteCategory = useDeleteCategory();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [name, setName] = useState(category.name);
+  const [isExtraDefault, setIsExtraDefault] = useState(
+    category.is_extra_default,
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  function startEditing() {
+    setName(category.name);
+    setIsExtraDefault(category.is_extra_default);
+    setError(null);
+    setIsEditing(true);
+  }
+
+  async function handleSave() {
+    setError(null);
+    try {
+      await updateCategory.mutateAsync({
+        id: category.id,
+        name,
+        is_extra_default: isExtraDefault,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar");
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("¿Eliminar esta categoría?")) return;
+    await deleteCategory.mutateAsync(category.id);
+  }
+
+  if (isEditing) {
+    return (
+      <Card className="py-4">
+        <div className="flex flex-col gap-3">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <label className="flex items-center gap-2 text-sm text-on-surface-variant">
+            <input
+              type="checkbox"
+              checked={isExtraDefault}
+              onChange={(e) => setIsExtraDefault(e.target.checked)}
+            />
+            Usar como categoría por defecto (&quot;Extras/Imprevistos&quot;)
+          </label>
+          {error && (
+            <p className="text-sm text-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setIsEditing(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={updateCategory.isPending}>
+              {updateCategory.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="flex items-center justify-between py-4">
+      <div>
+        <p className="text-on-surface font-medium">{category.name}</p>
+        {category.is_extra_default && (
+          <p className="text-on-surface-variant text-xs font-mono uppercase tracking-wider">
+            Extras/Imprevistos
+          </p>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Button variant="secondary" onClick={startEditing}>
+          Editar
+        </Button>
+        <Button variant="danger" onClick={handleDelete}>
+          Eliminar
+        </Button>
+      </div>
+    </Card>
   );
 }

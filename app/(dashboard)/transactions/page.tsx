@@ -11,7 +11,11 @@ import {
   useCreateTransaction,
   useDeleteTransaction,
   useTransactions,
+  useUpdateTransaction,
+  type TransactionWithRelations,
 } from "@/lib/hooks/use-transactions";
+import type { Account } from "@/lib/hooks/use-accounts";
+import type { Category } from "@/lib/hooks/use-categories";
 
 const TYPES = [
   { value: "expense", label: "Gasto" },
@@ -30,7 +34,6 @@ export default function TransactionsPage() {
   const { data: categories } = useCategories();
   const { data: transactions, isLoading } = useTransactions();
   const createTransaction = useCreateTransaction();
-  const deleteTransaction = useDeleteTransaction();
 
   const [type, setType] = useState<(typeof TYPES)[number]["value"]>("expense");
   const [accountId, setAccountId] = useState("");
@@ -86,11 +89,6 @@ export default function TransactionsPage() {
         err instanceof Error ? err.message : "Error al registrar la transacción",
       );
     }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar esta transacción?")) return;
-    await deleteTransaction.mutateAsync(id);
   }
 
   const noAccounts = accounts && accounts.length === 0;
@@ -211,30 +209,11 @@ export default function TransactionsPage() {
         <ul className="space-y-3">
           {transactions.map((tx) => (
             <li key={tx.id}>
-              <Card className="flex items-center justify-between py-4">
-                <div>
-                  <p className="text-on-surface font-medium">
-                    {tx.description || tx.categories?.name || "Sin descripción"}
-                  </p>
-                  <p className="text-on-surface-variant text-sm font-mono">
-                    {tx.transaction_date} · {tx.accounts?.name}
-                    {tx.categories?.name ? ` · ${tx.categories.name}` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span
-                    className={`font-mono font-semibold ${
-                      tx.type === "income" ? "text-secondary" : "text-on-surface"
-                    }`}
-                  >
-                    {tx.type === "expense" ? "-" : "+"}
-                    {tx.amount} {tx.currency}
-                  </span>
-                  <Button variant="danger" onClick={() => handleDelete(tx.id)}>
-                    Eliminar
-                  </Button>
-                </div>
-              </Card>
+              <TransactionRow
+                tx={tx}
+                accounts={accounts ?? []}
+                categories={categories ?? []}
+              />
             </li>
           ))}
         </ul>
@@ -244,5 +223,184 @@ export default function TransactionsPage() {
         </p>
       )}
     </div>
+  );
+}
+
+function TransactionRow({
+  tx,
+  accounts,
+  categories,
+}: {
+  tx: TransactionWithRelations;
+  accounts: Account[];
+  categories: Category[];
+}) {
+  const updateTransaction = useUpdateTransaction();
+  const deleteTransaction = useDeleteTransaction();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [type, setType] = useState<(typeof TYPES)[number]["value"]>(
+    tx.type as (typeof TYPES)[number]["value"],
+  );
+  const [accountId, setAccountId] = useState(tx.account_id);
+  const [categoryId, setCategoryId] = useState(tx.category_id ?? "");
+  const [amount, setAmount] = useState(String(tx.amount));
+  const [description, setDescription] = useState(tx.description ?? "");
+  const [date, setDate] = useState(tx.transaction_date);
+  const [error, setError] = useState<string | null>(null);
+
+  const selectedAccount = useMemo(
+    () => accounts.find((a) => a.id === accountId),
+    [accounts, accountId],
+  );
+
+  function startEditing() {
+    setType(tx.type as (typeof TYPES)[number]["value"]);
+    setAccountId(tx.account_id);
+    setCategoryId(tx.category_id ?? "");
+    setAmount(String(tx.amount));
+    setDescription(tx.description ?? "");
+    setDate(tx.transaction_date);
+    setError(null);
+    setIsEditing(true);
+  }
+
+  async function handleSave() {
+    setError(null);
+    if (!selectedAccount) {
+      setError("Elegí una cuenta.");
+      return;
+    }
+    try {
+      await updateTransaction.mutateAsync({
+        id: tx.id,
+        account_id: selectedAccount.id,
+        category_id: categoryId || null,
+        type,
+        amount: Number(amount),
+        currency: selectedAccount.currency,
+        description: description || null,
+        transaction_date: date,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar");
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("¿Eliminar esta transacción?")) return;
+    await deleteTransaction.mutateAsync(tx.id);
+  }
+
+  if (isEditing) {
+    return (
+      <Card className="py-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Select
+              value={type}
+              onChange={(e) =>
+                setType(e.target.value as (typeof TYPES)[number]["value"])
+              }
+            >
+              {TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.currency})
+                </option>
+              ))}
+            </Select>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+
+          <Select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+          >
+            <option value="">Sin categoría</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Descripción (opcional)"
+          />
+
+          {error && (
+            <p className="text-sm text-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="flex gap-2 justify-end">
+            <Button variant="secondary" onClick={() => setIsEditing(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={updateTransaction.isPending}>
+              {updateTransaction.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="flex items-center justify-between py-4">
+      <div>
+        <p className="text-on-surface font-medium">
+          {tx.description || tx.categories?.name || "Sin descripción"}
+        </p>
+        <p className="text-on-surface-variant text-sm font-mono">
+          {tx.transaction_date} · {tx.accounts?.name}
+          {tx.categories?.name ? ` · ${tx.categories.name}` : ""}
+        </p>
+      </div>
+      <div className="flex items-center gap-4">
+        <span
+          className={`font-mono font-semibold ${
+            tx.type === "income" ? "text-secondary" : "text-on-surface"
+          }`}
+        >
+          {tx.type === "expense" ? "-" : "+"}
+          {tx.amount} {tx.currency}
+        </span>
+        <Button variant="secondary" onClick={startEditing}>
+          Editar
+        </Button>
+        <Button variant="danger" onClick={handleDelete}>
+          Eliminar
+        </Button>
+      </div>
+    </Card>
   );
 }

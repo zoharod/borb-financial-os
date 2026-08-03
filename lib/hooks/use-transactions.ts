@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import type { TablesInsert } from "@/types/supabase";
+import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
+import type { TablesInsert, TablesUpdate } from "@/types/supabase";
 
 export type TransactionWithRelations = {
   id: string;
@@ -18,8 +19,13 @@ export type TransactionWithRelations = {
 };
 
 export function useTransactions() {
+  const userId = useAuthUserId();
+
   return useQuery({
-    queryKey: ["transactions"],
+    // Ver use-current-household.ts: key con userId para no mezclar cache
+    // entre usuarios distintos en el mismo navegador.
+    queryKey: ["transactions", userId],
+    enabled: !!userId,
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -51,6 +57,26 @@ export function useCreateTransaction() {
       const { error } = await supabase
         .from("transactions")
         .insert({ ...transaction, created_by: user.id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+}
+
+export function useUpdateTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...updates
+    }: TablesUpdate<"transactions"> & { id: string }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("transactions")
+        .update(updates)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

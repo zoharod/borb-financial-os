@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
 import type { TablesInsert } from "@/types/supabase";
 
 export type BudgetWithCategory = {
@@ -14,8 +15,13 @@ export type BudgetWithCategory = {
 };
 
 export function useBudgets(month: string) {
+  const userId = useAuthUserId();
+
   return useQuery({
-    queryKey: ["budgets", month],
+    // Ver use-current-household.ts: key con userId para no mezclar cache
+    // entre usuarios distintos en el mismo navegador.
+    queryKey: ["budgets", month, userId],
+    enabled: !!userId,
     queryFn: async () => {
       const supabase = createClient();
       const { data, error } = await supabase
@@ -35,8 +41,13 @@ export function useBudgets(month: string) {
 // sobrevive ese round-trip — al hidratar queda como objeto sin métodos y
 // revienta el componente. Cualquier dato cacheado acá debe ser JSON-safe.
 export function useMonthlyActuals(month: string) {
+  const userId = useAuthUserId();
+
   return useQuery({
-    queryKey: ["monthly-actuals", month],
+    // Ver use-current-household.ts: key con userId para no mezclar cache
+    // entre usuarios distintos en el mismo navegador.
+    queryKey: ["monthly-actuals", month, userId],
+    enabled: !!userId,
     queryFn: async () => {
       const supabase = createClient();
       const monthStart = month;

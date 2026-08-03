@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
 
 export function currentMonthISO() {
   const d = new Date();
@@ -23,8 +24,13 @@ export type DashboardSummary = {
 };
 
 export function useDashboardSummary(month: string) {
+  const userId = useAuthUserId();
+
   return useQuery({
-    queryKey: ["dashboard-summary", month],
+    // Ver use-current-household.ts: key con userId para no mezclar cache
+    // entre usuarios distintos en el mismo navegador.
+    queryKey: ["dashboard-summary", month, userId],
+    enabled: !!userId,
     queryFn: async (): Promise<DashboardSummary> => {
       const supabase = createClient();
       const { data, error } = await supabase
