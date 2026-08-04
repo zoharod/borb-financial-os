@@ -16,30 +16,43 @@ export type Database = {
     Tables: {
       accounts: {
         Row: {
+          card_id: string | null
           created_at: string
           currency: string
           household_id: string
           id: string
+          institution: string | null
           name: string
           type: string
         }
         Insert: {
+          card_id?: string | null
           created_at?: string
           currency: string
           household_id: string
           id?: string
+          institution?: string | null
           name: string
           type: string
         }
         Update: {
+          card_id?: string | null
           created_at?: string
           currency?: string
           household_id?: string
           id?: string
+          institution?: string | null
           name?: string
           type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "accounts_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "accounts_household_id_fkey"
             columns: ["household_id"]
@@ -84,6 +97,62 @@ export type Database = {
           },
           {
             foreignKeyName: "budgets_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
+          bank: string | null
+          cardholder: string | null
+          created_at: string
+          credit_limit: number | null
+          full_payment_amount: number | null
+          household_id: string
+          id: string
+          last4: string | null
+          minimum_payment: number | null
+          name: string
+          network: string | null
+          payment_due_day: number | null
+          statement_closing_day: number | null
+        }
+        Insert: {
+          bank?: string | null
+          cardholder?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          full_payment_amount?: number | null
+          household_id: string
+          id?: string
+          last4?: string | null
+          minimum_payment?: number | null
+          name: string
+          network?: string | null
+          payment_due_day?: number | null
+          statement_closing_day?: number | null
+        }
+        Update: {
+          bank?: string | null
+          cardholder?: string | null
+          created_at?: string
+          credit_limit?: number | null
+          full_payment_amount?: number | null
+          household_id?: string
+          id?: string
+          last4?: string | null
+          minimum_payment?: number | null
+          name?: string
+          network?: string | null
+          payment_due_day?: number | null
+          statement_closing_day?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
@@ -161,18 +230,24 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          onboarding_step: string
+          secondary_currency: string | null
         }
         Insert: {
           base_currency_default?: string
           created_at?: string
           id?: string
           name: string
+          onboarding_step?: string
+          secondary_currency?: string | null
         }
         Update: {
           base_currency_default?: string
           created_at?: string
           id?: string
           name?: string
+          onboarding_step?: string
+          secondary_currency?: string | null
         }
         Relationships: []
       }
@@ -271,7 +346,11 @@ export type Database = {
     }
     Functions: {
       create_household_for_current_user: {
-        Args: { household_name: string }
+        Args: {
+          household_name: string
+          household_secondary_currency?: string
+          primary_currency?: string
+        }
         Returns: string
       }
       user_household_ids: { Args: never; Returns: string[] }

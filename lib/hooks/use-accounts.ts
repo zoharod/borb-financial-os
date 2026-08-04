@@ -33,8 +33,13 @@ export function useCreateAccount() {
   return useMutation({
     mutationFn: async (account: TablesInsert<"accounts">) => {
       const supabase = createClient();
-      const { error } = await supabase.from("accounts").insert(account);
+      const { data, error } = await supabase
+        .from("accounts")
+        .insert(account)
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accounts"] });

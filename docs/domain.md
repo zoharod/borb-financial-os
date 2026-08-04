@@ -19,24 +19,37 @@ Esto ya funciona hoy: una compra con tarjeta se puede cargar como `type='expense
 
 `type='card_payment'`, se comporta exactamente como una transferencia (mismo mecanismo de `to_account_id`), pero la cuenta destino debe ser `type='credit_card'`. Reduce la deuda (el saldo de la cuenta tarjeta se vuelve menos negativo). No cuenta como gasto nuevo — la UI y los agregados ya lo tratan igual que `transfer` a propósito, evitando duplicar el gasto que ya se registró (o se registrará, ver Fase 2) cuando se hizo la compra.
 
-## Tarjetas (`cards`) — Fase 2, no implementado
+## Tarjetas (`cards`) — implementada (onboarding refinado); cashback sigue siendo Fase 2
 
-Una **tarjeta** es distinta de una **cuenta `credit_card`**: la cuenta es el libro contable (cuánto debés, ya funciona desde Fase 1-C); la tarjeta es la identidad física/virtual con sus reglas propias (límite, cashback, ciclo de facturación). Relación 1:1 propuesta:
+Una **tarjeta** es distinta de una **cuenta `credit_card`**: la cuenta es el libro contable (cuánto debés, ya funciona desde Fase 1-C); la tarjeta es la identidad física/virtual con sus reglas propias (límite, cashback, ciclo de facturación). La tabla `cards` se creó antes de lo previsto en este documento, como parte del onboarding refinado (no de Fase 2) — la relación terminó siendo **1:N, no 1:1** como se había propuesto acá originalmente:
 
 ```sql
--- Propuesta Fase 2, NO IMPLEMENTADO — revisar antes de migrar
+-- YA IMPLEMENTADO (migración 20260804110528)
 cards (
   id uuid pk,
   household_id uuid fk,
-  account_id uuid fk -> accounts (unique), -- 1:1, esa account.type debe ser 'credit_card'
   name text, -- "Visa Signature BAC"
+  bank text null,
+  cardholder text null,
+  network text null, -- check: 'visa' | 'mastercard' | 'amex' | 'other'
   last4 text null,
   credit_limit numeric null,
   statement_closing_day int null, -- día del mes 1-31
   payment_due_day int null,
+  minimum_payment numeric null,
+  full_payment_amount numeric null,
   created_at timestamptz
 )
 
+-- accounts gana card_id (nullable, on delete set null) en vez de cards.account_id
+```
+
+**Por qué 1:N (hasta 2 cuentas por tarjeta) y no 1:1:** una tarjeta puede tener saldo/deuda en más de una moneda (ej. una tarjeta BAC con consumos en HNL y en USD) — modelarla como `accounts.card_id -> cards.id` (en vez de `cards.account_id -> accounts.id` único) permite que el wizard de onboarding cree **una fila de `accounts` (`type='credit_card'`) por cada moneda en la que el usuario cargó saldo**, todas apuntando a la misma tarjeta, sin forzar a combinar HNL y USD en un solo número ni a elegir una tarjeta "por moneda" artificialmente. El saldo de cada cuenta-tarjeta sigue siendo el mismo mecanismo de siempre (derivado de `transactions`, negativo = deuda) — `cards` solo agrega la metadata que no varía por moneda (nombre, banco, ciclo de facturación, límite, pagos).
+
+**Todavía no implementado (sigue siendo Fase 2):** `card_cashback_rules` y el uso de `transactions.card_id` para vincular compras a una tarjeta específica — ver siguiente sección, sin cambios respecto al plan original.
+
+```sql
+-- Propuesta Fase 2, NO IMPLEMENTADO — revisar antes de migrar
 card_cashback_rules (
   id uuid pk,
   card_id uuid fk -> cards,
@@ -48,6 +61,14 @@ card_cashback_rules (
 ```
 
 Por qué separar `cards` de `accounts` en vez de meterle más columnas a `accounts`: el saldo/deuda ya es un concepto genérico de cuenta (funciona igual para cualquier `credit_card` sin necesitar reglas de cashback), mientras que límite/ciclo/cashback son metadata específica de tarjeta que no aplica a `checking`/`savings`. Mantenerlos separados evita ensuciar `accounts` con columnas que están `null` para la mayoría de las filas.
+
+## Subida de estado de cuenta (extracción) — preparado en el schema, no implementado
+
+El paso de onboarding de tarjetas incluye un input de archivo ("Subir tu último estado de cuenta") que hoy solo muestra un mensaje de "próximamente" — no parsea nada ni guarda el archivo. Cuando se implemente (fase de importación de estados de cuenta, todavía sin numerar en el roadmap):
+
+- Todos los campos que un parser necesitaría llenar (banco, últimos 4, tarjetahabiente, período/día de corte, día de pago, saldo por moneda, pago mínimo, pago de contado, límite) **ya existen** en `cards`/`accounts` — no debería hacer falta otra migración de schema para el caso básico.
+- **Regla de producto ya decidida (no reabrir sin razón nueva):** los datos extraídos se muestran siempre para revisión del usuario antes de guardar — nunca un guardado silencioso. El usuario debe poder Confirmar, Corregir, Completar campos faltantes, o Descartar (Skip) la extracción.
+- Transacciones recientes extraídas del estado de cuenta (si el parser las soporta) seguirían insertándose como `transactions` normales — no necesitan una tabla nueva, mismo mecanismo que la importación CSV de Fase 1-B.
 
 ## Compras con tarjeta — Fase 2, no implementado
 

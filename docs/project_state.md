@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-04
-**Fase actual:** Fase 1-C completa ✅ (con `domain.md` para preparar Fase 2) — el usuario está validando el login/onboarding real él mismo; queda pendiente borrar usuarios de prueba cuando lo confirme
+**Fase actual:** Fase 1-C completa ✅ + Onboarding refinado (5 pasos) completo ✅ — listo para arrancar Fase 2 (Tarjetas y Cashback); queda pendiente borrar usuarios de prueba cuando el usuario lo confirme
 
 ---
 
@@ -57,17 +57,27 @@
   - **Probado en navegador de punta a punta** con 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) en Casa Test B: transferencia (dashboard sin cambios ✓), pago de tarjeta (sin duplicar gasto ✓), devolución (resta 100 de "Gastos del mes" y del presupuesto de Comida ✓), ajuste vía conciliación (+20.50 y luego -50, saldo actualizado en vivo tras el fix ✓).
 - [x] **`docs/domain.md` creado — pedido explícito del usuario antes de arrancar Fase 2**, para no rediseñar el modelo de cuentas/tarjetas a mitad de esa fase. Define: cuentas `credit_card` ya funcionan como "libro contable" de deuda (saldo negativo = debés) desde Fase 1-C; una `card` (Fase 2, no implementada) es una entidad separada 1:1 con una cuenta `credit_card` que agrega límite/ciclo/reglas de cashback, sin ensuciar `accounts` con columnas que no aplican a `checking`/`savings`; propuesta de schema `cards` + `card_cashback_rules`; aclara que `transactions.card_id` (reservado desde Fase 0, sin uso hasta ahora) es lo que va a vincular una compra a una tarjeta específica para calcular cashback. Agregado a `CLAUDE.md` en el orden de lectura.
 
+- [x] **Onboarding refinado a wizard de 5 pasos** (pedido explícito del usuario, spec detallada en inglés). El wizard de 3 pasos asumía 1 sola cuenta y no distinguía tarjetas de crédito de cuentas normales. Nuevo flujo en `components/onboarding-guard.tsx` + `components/onboarding/*-step.tsx`:
+  1. **Hogar** — nombre, moneda primaria, moneda secundaria opcional.
+  2. **Cuentas** (repetible) — nombre/tipo/moneda/institución/saldo, "Agregar otra"/"Continuar", ≥1 requerida.
+  3. **Tarjetas de crédito** (repetible, opcional) — paso separado de "Cuentas" a propósito; cada tarjeta va a la tabla nueva `cards` y puede tener hasta 2 `accounts` vinculadas (`card_id`), una por moneda con saldo. Incluye placeholder de "Subir tu último estado de cuenta" (sin extracción real todavía, documentado como preparado-no-implementado en `domain.md`).
+  4. **Presupuesto mensual** (antes "Categorías") — reencuadrado: elegir categoría + monto + moneda juntos, no solo elegir categorías.
+  5. **Revisión** — resumen completo editable (cada sección con "Editar" que vuelve a su paso sin perder progreso) + "Finalizar".
+  - **Schema** (migración `20260804110528`): tabla `cards` nueva (bank/cardholder/network/last4/credit_limit/statement_closing_day/payment_due_day/minimum_payment/full_payment_amount); `accounts` gana `institution` y `card_id` (fk a `cards`, nullable); `households` gana `secondary_currency` y `onboarding_step` (check constraint, controla en qué paso quedó cada household — necesario porque tarjetas/presupuesto son opcionales y no se puede inferir el paso solo mirando si hay datos); `create_household_for_current_user` pasa de 1 a 3 argumentos. Backfill (`20260804141530`) para que households ya onboardeados antes de este cambio no vuelvan a ver el wizard.
+  - **Saldo inicial de cuentas/tarjetas:** no es una columna nueva — se siembra como transacción `type='adjustment'` (negativa para tarjetas = deuda), mismo mecanismo que la conciliación de Fase 1-C. Principio "transactions es la fuente de verdad" preservado.
+  - **Bug real encontrado y corregido: faltaba la policy RLS de UPDATE en `households`.** Existía desde Fase 0 con SELECT únicamente (nunca había hecho falta escribir desde el cliente). Al agregar `useUpdateOnboardingStep()`, todas las escrituras eran bloqueadas en silencio por RLS (sin error visible, sin policy que las permitiera) — el wizard completaba los 5 pasos correctamente en la UI pero `onboarding_step` se quedaba pegado en `'accounts'` (el valor inicial de la función `SECURITY DEFINER`), así que un refresh completo de página volvía a mostrar el wizard desde el Paso 2 aunque ya se hubiera hecho clic en "Finalizar". Detectado navegando fresco a `/dashboard` después de terminar el wizard y confirmado con curl directo a la API (`onboarding_step` en `'accounts'` en vez de `'done'`). Fix: migración `20260804150341_households_update_policy.sql` (policy de UPDATE, mismo patrón `id in (select public.user_household_ids())`). **Lección para cualquier tabla que gane su primera escritura desde el cliente: revisar explícitamente si ya tiene la policy correspondiente — RLS deniega por default sin avisar.**
+  - **Verificado en navegador de punta a punta** con usuario de prueba nuevo (`test-onboarding3@borb.test`, household "Casa Onboarding V2"): los 5 pasos, edición desde Revisión y vuelta, "Finalizar", y — después del fix de RLS — persistencia confirmada con un refresh completo de página (ya no vuelve a mostrar el wizard) y valores correctos en el dashboard (saldos por cuenta y tarjeta en HNL y USD).
+  - `docs/architecture.md` (sección "Onboarding refinado (5 pasos)" + schema) y `docs/domain.md` (`cards` pasó de "propuesta Fase 2" a "implementada", relación 1:N no 1:1) actualizados.
+
 ## 🔄 En progreso
 
-- **Punto 1 (validar onboarding + Google Login):** el usuario está probándolo personalmente con su cuenta real ahora mismo — no lo puedo completar yo.
 - **Limpiar usuarios de prueba:** pendiente que el usuario confirme que ya no los necesita antes de borrarlos (no es bloqueante para Fase 2).
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Esperar confirmación del usuario de que el login con Google + wizard de onboarding le funcionaron de punta a punta con su cuenta real.
-2. Arrancar Fase 2 (Tarjetas y Cashback) usando `docs/domain.md` como base del schema (`cards`, `card_cashback_rules`) — leerlo antes de escribir la migración.
-3. Preguntarle al usuario en algún momento si ya quiere que borre los usuarios de prueba (`test-a`, `test-b`) — no bloqueante, se puede hacer en paralelo a Fase 2.
-4. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción). Casa Test B ahora tiene 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) y varias transacciones de los 6 tipos, usadas para probar Fase 1-C.
+1. Arrancar Fase 2 (Tarjetas y Cashback) usando `docs/domain.md` como base del schema (`card_cashback_rules`, uso de `transactions.card_id`) — leerlo antes de escribir la migración. La tabla `cards` y el vínculo `accounts.card_id` ya existen (creados en el onboarding refinado), así que Fase 2 arranca extendiendo ese schema, no creándolo de cero.
+2. Preguntarle al usuario en algún momento si ya quiere que borre los usuarios de prueba (`test-a`, `test-b`) — no bloqueante, se puede hacer en paralelo a Fase 2.
+3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción). Casa Test B ahora tiene 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) y varias transacciones de los 6 tipos, usadas para probar Fase 1-C.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 

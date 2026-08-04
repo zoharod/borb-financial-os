@@ -53,7 +53,13 @@ Fase 1 solo tenía login (los 2 households de prueba se crearon a mano vía API 
 - **Creación de household al primer login:** mismo problema de "huevo y gallina" que ya resolvimos para RLS — un usuario recién autenticado no pertenece a ningún `household_members` todavía, así que no puede insertar su propio household ni membership desde el cliente (RLS lo bloquea, no hay policy de INSERT en `households` y la de `household_members` requiere ya pertenecer a un household). Se resuelve con otra función `SECURITY DEFINER`:
 
 ```sql
-create or replace function public.create_household_for_current_user(household_name text)
+-- Firma actual (3 args) — ampliada en el onboarding refinado para setear
+-- moneda secundaria y arrancar onboarding_step='accounts' de una vez.
+create or replace function public.create_household_for_current_user(
+  household_name text,
+  primary_currency text default 'HNL',
+  household_secondary_currency text default null
+)
 returns uuid
 language plpgsql
 security definer
@@ -69,27 +75,40 @@ begin
     raise exception 'user already belongs to a household';
   end if;
 
-  insert into households (name) values (household_name) returning id into new_household_id;
+  insert into households (name, base_currency_default, secondary_currency, onboarding_step)
+  values (household_name, primary_currency, household_secondary_currency, 'accounts')
+  returning id into new_household_id;
   insert into household_members (household_id, user_id, role) values (new_household_id, auth.uid(), 'owner');
 
   return new_household_id;
 end;
 $$;
-
-revoke all on function public.create_household_for_current_user(text) from public;
-grant execute on function public.create_household_for_current_user(text) to authenticated;
 ```
 
 - **`use-current-household.ts` usa `.maybeSingle()`, no `.single()`** — con `.single()`, 0 filas es un error (`PGRST116`); un usuario recién logueado sin household todavía necesita que esto devuelva `null` limpiamente, no que explote.
-- **`components/onboarding-guard.tsx`** (client component, envuelve `{children}` en `app/(dashboard)/layout.tsx`) es un wizard de 3 pasos, no solo "crear household" — dejar a un usuario nuevo en un dashboard completamente vacío sin pistas de qué cargar primero resultó confuso (feedback real del usuario). Orden de los pasos sigue las dependencias reales del modelo de datos (una transacción necesita cuenta; un presupuesto necesita categoría):
-  1. **Household** — nombre del hogar → `create_household_for_current_user`.
-  2. **Primera cuenta** — mismo form que `/accounts`, pero mínimo (sin lista).
-  3. **Categorías** — chips de sugeridas (`SUGGESTED_CATEGORIES` en `lib/constants.ts`: Comida, Transporte, Vivienda, Servicios, Salud, Entretenimiento, + Extras/Imprevistos marcada `is_extra_default`) más un input libre; un click por chip la crea al toque. Requiere al menos 1 para avanzar.
-  4. Con household + ≥1 cuenta + ≥1 categoría, renderiza `{children}` (la app normal).
 
-  Presupuesto queda afuera del wizard a propósito — no es prerequisito de nada más y su propia página (`/budgets`) ya lo resuelve bien; forzarlo acá sería fricción sin beneficio.
+### Onboarding refinado (5 pasos) — reemplaza al wizard de 3 pasos de Fase 1
 
-  `lib/constants.ts` centraliza `CURRENCIES`, `ACCOUNT_TYPES` y `SUGGESTED_CATEGORIES` porque el wizard reutiliza los mismos valores que `/accounts` y `/budgets` — evita que las opciones queden inconsistentes si se agrega una moneda o un tipo de cuenta nuevo.
+El wizard original (household → 1 cuenta → categorías) asumía una sola cuenta y no dejaba lugar para tarjetas de crédito ni saldos iniciales. Pedido explícito del usuario para que el onboarding soporte **múltiples cuentas, tarjetas como paso propio (no como "cuenta" genérica), carga de saldo inicial, y que el paso de categorías se entienda como "armar tu presupuesto mensual"** en vez de solo "elegí categorías". `components/onboarding-guard.tsx` ahora es un wizard de **5 pasos**, cada uno su propio componente en `components/onboarding/`:
+
+1. **Household** (`household-step.tsx`) — nombre del hogar, moneda primaria, moneda secundaria opcional (HNL/USD, independientes, sin conversión — ver "Moneda"). Llama a `create_household_for_current_user` (ver abajo, ahora recibe las 2 monedas).
+2. **Cuentas** (`accounts-step.tsx`) — **repetible**: el usuario agrega cuentas una por una (nombre, tipo `checking`/`savings`, moneda, institución opcional, saldo actual opcional) con "Agregar cuenta" / "Continuar"; no asume 1 sola cuenta. Requiere ≥1 para avanzar. El saldo actual **no es una columna nueva** — sigue el principio de "transactions es la fuente de verdad": si el usuario carga un saldo, se crea la cuenta y después una transacción `type='adjustment'` por ese monto (mismo mecanismo que la conciliación de Fase 1-C), no un campo `balance` en `accounts`.
+3. **Tarjetas de crédito** (`cards-step.tsx`) — paso separado a propósito (no se crean como cuenta `checking`/`savings` genérica). **Repetible** y **opcional** (0 tarjetas es válido, "Continuar" nunca se bloquea). Cada tarjeta crea una fila en la nueva tabla `cards` (nombre, banco, tarjetahabiente, red, últimos 4, límite, día de corte, día de pago, pago mínimo, pago de contado — todos menos nombre/red son opcionales) y **hasta 2 filas en `accounts`** (`type='credit_card'`, `card_id` apuntando a la tarjeta), una por cada moneda en la que el usuario cargó saldo (HNL y/o USD) — así una tarjeta con deuda en ambas monedas no fuerza a combinarlas. El saldo de cada cuenta-tarjeta se siembra igual que en el paso 2, con una transacción `adjustment` **negativa** (saldo negativo = deuda, convención ya establecida en `domain.md`).
+   - **Subida de estado de cuenta:** input de archivo presente en la UI ("Subir tu último estado de cuenta"), pero **no hace extracción todavía** — muestra un mensaje de "función disponible próximamente" y no guarda nada. Es intencional para el MVP (ver más abajo); el modelo de datos de `cards` ya tiene todos los campos que un parser de PDF necesitaría llenar el día que se implemente, así que activarlo no va a requerir otra migración.
+4. **Presupuesto mensual** (`budget-step.tsx`) — reemplaza al viejo paso de "Categorías". Reencuadrado a propósito: no es "elegí categorías" sino "decidí cuánto vas a gastar este mes en cada una". Chips de categorías sugeridas (`BUDGET_CATEGORIES` en `lib/constants.ts`) + categoría personalizada por texto libre; click en una categoría abre un mini-form inline de monto+moneda que crea la categoría **y** su `budget` del mes actual juntos. Opcional (0 categorías es válido).
+5. **Revisión** (`review-step.tsx`) — resumen completo (hogar, cuentas con saldo, tarjetas con deuda por moneda, presupuesto con total por moneda), cada sección con botón "Editar" que vuelve a su paso (ver `editMode` abajo) sin perder lo ya guardado. Botón "Finalizar".
+
+**Por qué el progreso se persiste en una columna (`households.onboarding_step`) y no se infiere de los datos:** a diferencia del wizard de 3 pasos (donde "¿tiene ≥1 cuenta?" alcanzaba para saber en qué paso estaba), acá tarjetas y presupuesto son **opcionales** — un household con 0 tarjetas puede estar legítimamente "ya terminado" o "todavía no llegó a ese paso", y no hay forma de distinguirlo mirando solo si existen filas en `cards`/`budgets`. `onboarding_step` (check constraint: `household`|`accounts`|`cards`|`budget`|`review`|`done`) se actualiza en cada "Continuar" (nunca en "Atrás", que es navegación local nomás). El componente separa `OnboardingGuard` (decide loading / sin household / wizard) de un `OnboardingWizard` interno **keyed por `household.household_id`** con `useState(() => ...)` como inicializador perezoso del paso local — necesario para pasar el lint de este proyecto (`react-hooks/refs` prohíbe leer/escribir `ref.current` durante el render; un `useEffect` para sincronizar el paso inicial también fue rechazado por `react-hooks/set-state-in-effect`).
+
+`editMode` (flag local, no persistido) maneja "Editar desde Revisión": entrar a un paso mediante "Editar" no debe hacer que su "Continuar" avance la secuencia normal, sino volver derecho a Revisión.
+
+**⚠️ Bug real encontrado y corregido (RLS faltante):** `households` solo tenía policy de **SELECT** desde su creación en Fase 0 — nunca había hecho falta un UPDATE desde el cliente hasta agregar `onboarding_step`. Al agregar `useUpdateOnboardingStep()` (un `.update().eq("id", householdId)` desde el cliente), **todas las escrituras eran bloqueadas en silencio por RLS** (deny-by-default, sin policy de UPDATE que las permita) — la app no mostraba ningún error porque nada esperaba/capturaba el resultado de la mutación, así que el wizard completaba los 5 pasos con éxito en la UI (cuentas/tarjetas/presupuesto sí se guardaban bien, esas tablas ya tenían sus policies) pero `onboarding_step` se quedaba pegado en el valor que le puso la función `SECURITY DEFINER` al crear el household (`'accounts'`) — un refresh de página completo volvía a mostrar el wizard desde el paso 2 aunque ya se hubiera hecho clic en "Finalizar". Fix (migración `20260804150341_households_update_policy.sql`): agregar policy de UPDATE con el mismo patrón de siempre (`id in (select public.user_household_ids())`). **Lección: cualquier tabla que empiece de solo-lectura y después gane una escritura desde el cliente necesita revisar explícitamente si ya tiene la policy correspondiente — Postgres RLS deniega por default, no avisa.**
+
+`lib/constants.ts` centraliza `CURRENCIES`, `ACCOUNT_TYPES`, `CARD_NETWORKS` y `BUDGET_CATEGORIES` porque el wizard reutiliza los mismos valores que `/accounts`, `/budgets` y (para tarjetas) una futura `/cards` — evita que las opciones queden inconsistentes si se agrega una moneda o un tipo nuevo.
+
+**MVP vs. diferido a la fase de importación de estados de cuenta:**
+- **En el MVP (ya implementado):** los 5 pasos completos, cuentas y tarjetas repetibles, saldo inicial vía `adjustment`, tarjetas con soporte de 2 monedas, presupuesto con monto+moneda por categoría, revisión editable, persistencia de progreso.
+- **Preparado en el schema pero sin UI de extracción todavía:** todos los campos de `cards` que un parser de estado de cuenta necesitaría (banco, últimos 4, tarjetahabiente, día de corte, día de pago, pago mínimo, pago de contado, límite) ya existen como columnas nullable — activar la extracción real (PDF/imagen → estos campos, mostrados siempre para revisión antes de guardar, nunca guardado silencioso) es una fase futura que **no requiere otra migración**, solo la lógica de parseo + una UI de confirmación/corrección.
 
 ## Esquema de base de datos — Fase 1
 
@@ -97,7 +116,10 @@ grant execute on function public.create_household_for_current_user(text) to auth
 households (
   id uuid pk,
   name text,
-  base_currency_default text,
+  base_currency_default text, -- moneda primaria
+  secondary_currency text null, -- agregado en onboarding refinado: moneda secundaria opcional
+  onboarding_step text default 'household', -- agregado en onboarding refinado, ver "Onboarding refinado"
+    -- check: 'household' | 'accounts' | 'cards' | 'budget' | 'review' | 'done'
   created_at timestamptz
 )
 
@@ -115,6 +137,27 @@ accounts (
   name text,
   currency text, -- 'HNL' | 'USD'
   type text, -- 'checking' | 'savings' | 'credit_card' (credit_card agregado en Fase 1-C)
+  institution text null, -- agregado en onboarding refinado (ej. "BAC", "Ficohsa")
+  card_id uuid fk -> cards null, -- agregado en onboarding refinado: presente solo si type='credit_card' y viene del wizard de tarjetas; on delete set null
+  created_at timestamptz
+)
+
+cards (
+  -- agregado en el onboarding refinado (antes solo existía como propuesta en domain.md
+  -- para Fase 2). Una tarjeta puede tener hasta 2 filas de accounts vinculadas (una por
+  -- moneda en la que tiene saldo) — ver "Onboarding refinado" y domain.md.
+  id uuid pk,
+  household_id uuid fk,
+  name text,
+  bank text null,
+  cardholder text null,
+  network text null, -- check: 'visa' | 'mastercard' | 'amex' | 'other'
+  last4 text null,
+  credit_limit numeric null,
+  statement_closing_day int null, -- check 1-31
+  payment_due_day int null, -- check 1-31
+  minimum_payment numeric null,
+  full_payment_amount numeric null,
   created_at timestamptz
 )
 
@@ -273,10 +316,11 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 /components
   sign-out-button.tsx          ✅
   nav-links.tsx                ✅
-  onboarding-guard.tsx         ✅ wizard de 3 pasos para usuarios nuevos
+  onboarding-guard.tsx         ✅ wizard de 5 pasos para usuarios nuevos (ver "Onboarding refinado")
+  /onboarding                  ✅ household/accounts/cards/budget/review-step.tsx + step-shell.tsx
   /ui                          ✅ Fase 1 (Button, Input, Select, Card)
 /lib
-  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, SUGGESTED_CATEGORIES
+  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES
   /supabase                    ✅ client.ts / server.ts / middleware.ts
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
   /hooks                       ✅ Fase 1, React Query hooks (uno por recurso + use-auth-user-id.ts)

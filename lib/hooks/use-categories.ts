@@ -33,8 +33,13 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: async (category: TablesInsert<"categories">) => {
       const supabase = createClient();
-      const { error } = await supabase.from("categories").insert(category);
+      const { data, error } = await supabase
+        .from("categories")
+        .insert(category)
+        .select()
+        .single();
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
