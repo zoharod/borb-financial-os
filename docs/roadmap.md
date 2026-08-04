@@ -52,7 +52,7 @@ Probado en navegador: parseo, preview, un caso de duplicado detectado correctame
 ---
 
 ## Fase 1-C — Integridad Financiera
-**Estado: técnicamente completa — quedan 2 puntos que dependen del usuario (1 y 7)**
+**Estado: técnicamente completa — queda 1 punto que depende del usuario (1) y 1 opcional (7)**
 
 Decisión explícita del usuario: antes de Fase 2 (Tarjetas/Cashback), cerrar esta fase para que los números del dashboard sean confiables al 100% con dinero real. Alcance:
 
@@ -63,6 +63,7 @@ Decisión explícita del usuario: antes de Fase 2 (Tarjetas/Cashback), cerrar es
 5. [x] Confirmar que pagos de tarjeta no duplican el gasto (se tratan como transferencia, no como gasto nuevo) — probado en navegador.
 6. [x] Agregar conciliación básica de saldos (saldo calculado vs. saldo real declarado → genera un ajuste) — probado en navegador.
 7. [ ] Limpiar usuarios de prueba (`test-a`, `test-b`) cuando el usuario confirme que ya no los necesita.
+8. [x] Definir en `docs/domain.md` cómo se van a representar cuentas, tarjetas, transferencias y pagos de tarjeta antes de arrancar Fase 2 — pedido explícito del usuario para no rediseñar el modelo a mitad de esa fase.
 
 Probado también: trigger de integridad a nivel de base de datos rechaza (con curl directo, bypaseando RLS y la UI) transferencias con moneda distinta entre origen/destino, `to_account_id` faltante o presente donde no corresponde, y cuentas de otro household — ver `project_state.md` para el detalle de cada caso.
 

@@ -3,7 +3,7 @@
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
 **Última actualización:** 2026-08-04
-**Fase actual:** Fase 1-C técnicamente completa ✅ — quedan 2 puntos que dependen del usuario (confirmar login real, borrar usuarios de prueba)
+**Fase actual:** Fase 1-C completa ✅ (con `domain.md` para preparar Fase 2) — el usuario está validando el login/onboarding real él mismo; queda pendiente borrar usuarios de prueba cuando lo confirme
 
 ---
 
@@ -55,17 +55,18 @@
   - **`/accounts` ahora muestra el saldo calculado de cada cuenta** y tiene una acción "Conciliar": el usuario ingresa el saldo real (según el banco), ve la diferencia, y un botón crea una transacción `type='adjustment'` por esa diferencia con `reconciled_at = now()`.
   - **Bug encontrado y corregido: ninguna mutación de transacciones invalidaba `dashboard-summary`/`monthly-actuals`/`account-balances`, solo `transactions`.** Se detectó probando la conciliación sin navegar fuera de `/accounts` (sin remount de página no hay refetch automático, así que el saldo mostrado quedaba viejo después de crear el ajuste, aunque el ajuste sí se había guardado bien en la base). Los tests anteriores de transfer/card_payment/refund habían "pasado" por casualidad de timing (`staleTime` de 60s ya vencido al momento de revisar, después de navegar entre páginas), no porque la invalidación estuviera bien armada. Fix: `invalidateTransactionDerivedQueries()` en `use-transactions.ts`, usada por las 3 mutaciones y por `useBulkCreateTransactions` (CSV import). Ver regla nueva en `architecture.md`.
   - **Probado en navegador de punta a punta** con 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) en Casa Test B: transferencia (dashboard sin cambios ✓), pago de tarjeta (sin duplicar gasto ✓), devolución (resta 100 de "Gastos del mes" y del presupuesto de Comida ✓), ajuste vía conciliación (+20.50 y luego -50, saldo actualizado en vivo tras el fix ✓).
+- [x] **`docs/domain.md` creado — pedido explícito del usuario antes de arrancar Fase 2**, para no rediseñar el modelo de cuentas/tarjetas a mitad de esa fase. Define: cuentas `credit_card` ya funcionan como "libro contable" de deuda (saldo negativo = debés) desde Fase 1-C; una `card` (Fase 2, no implementada) es una entidad separada 1:1 con una cuenta `credit_card` que agrega límite/ciclo/reglas de cashback, sin ensuciar `accounts` con columnas que no aplican a `checking`/`savings`; propuesta de schema `cards` + `card_cashback_rules`; aclara que `transactions.card_id` (reservado desde Fase 0, sin uso hasta ahora) es lo que va a vincular una compra a una tarjeta específica para calcular cashback. Agregado a `CLAUDE.md` en el orden de lectura.
 
 ## 🔄 En progreso
 
-- **Punto 1 (validar onboarding + Google Login):** pendiente que el usuario confirme el login completo de punta a punta con su cuenta real — no lo puedo completar yo.
-- **Punto 7 (limpiar usuarios de prueba):** pendiente que el usuario confirme que ya no los necesita antes de borrarlos.
+- **Punto 1 (validar onboarding + Google Login):** el usuario está probándolo personalmente con su cuenta real ahora mismo — no lo puedo completar yo.
+- **Limpiar usuarios de prueba:** pendiente que el usuario confirme que ya no los necesita antes de borrarlos (no es bloqueante para Fase 2).
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Confirmar con el usuario que el login con Google + wizard de onboarding funcionan completo con su cuenta real (punto 1 de Fase 1-C).
-2. Preguntarle al usuario si ya quiere que borre los usuarios de prueba (punto 7 de Fase 1-C) — con eso Fase 1-C queda 100% cerrada.
-3. Decidir: ¿Fase 2 (Tarjetas y Cashback, ahora con más base real gracias a la cuenta `credit_card`) u otra cosa?
+1. Esperar confirmación del usuario de que el login con Google + wizard de onboarding le funcionaron de punta a punta con su cuenta real.
+2. Arrancar Fase 2 (Tarjetas y Cashback) usando `docs/domain.md` como base del schema (`cards`, `card_cashback_rules`) — leerlo antes de escribir la migración.
+3. Preguntarle al usuario en algún momento si ya quiere que borre los usuarios de prueba (`test-a`, `test-b`) — no bloqueante, se puede hacer en paralelo a Fase 2.
 4. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción). Casa Test B ahora tiene 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) y varias transacciones de los 6 tipos, usadas para probar Fase 1-C.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)

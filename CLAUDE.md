@@ -11,8 +11,9 @@ Este proyecto es **Borb Financial OS**, una app de finanzas personales para un h
 1. `docs/PRD.md` — qué se construye y por qué (producto).
 2. `docs/TDR.md` — requisitos técnicos de alto nivel.
 3. `docs/architecture.md` — fuente de verdad técnica: stack, schema de base de datos, RLS, offline, moneda.
-4. `docs/roadmap.md` — plan por fases (Fase 0 a Fase 5).
-5. `docs/project_state.md` — backlog activo, qué está hecho, qué sigue, decisiones ya tomadas (no reabrir sin razón nueva).
+4. `docs/domain.md` — modelo de dominio conceptual (cuentas, tarjetas, transferencias, pagos); léelo antes de tocar algo relacionado a Fase 2 (Tarjetas y Cashback).
+5. `docs/roadmap.md` — plan por fases (Fase 0 a Fase 5).
+6. `docs/project_state.md` — backlog activo, qué está hecho, qué sigue, decisiones ya tomadas (no reabrir sin razón nueva).
 
 ## Principios no negociables
 
