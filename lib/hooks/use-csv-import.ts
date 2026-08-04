@@ -55,6 +55,7 @@ export function useBulkCreateTransactions() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
       queryClient.invalidateQueries({ queryKey: ["monthly-actuals"] });
       queryClient.invalidateQueries({ queryKey: ["existing-transaction-keys"] });
+      queryClient.invalidateQueries({ queryKey: ["account-balances"] });
     },
   });
 }

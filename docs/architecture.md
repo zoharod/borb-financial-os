@@ -114,7 +114,7 @@ accounts (
   household_id uuid fk,
   name text,
   currency text, -- 'HNL' | 'USD'
-  type text, -- 'checking' | 'savings'
+  type text, -- 'checking' | 'savings' | 'credit_card' (credit_card agregado en Fase 1-C)
   created_at timestamptz
 )
 
@@ -140,9 +140,10 @@ transactions (
   id uuid pk,
   household_id uuid fk,
   account_id uuid fk,
+  to_account_id uuid fk null, -- agregado en Fase 1-C: cuenta destino de transfer/card_payment
   category_id uuid fk null,
-  type text, -- 'income' | 'expense' | 'transfer'
-  amount numeric,
+  type text, -- 'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment' (4 últimos agregados en Fase 1-C)
+  amount numeric, -- siempre positivo, EXCEPTO 'adjustment' que puede ser negativo (ver "Transferencias y tipos de transacción")
   currency text,
   description text,
   transaction_date date,
@@ -150,7 +151,7 @@ transactions (
   status text default 'confirmed', -- 'confirmed' | 'pending'
   source text default 'manual', -- reservado: 'manual'|'csv'|'email'|'ocr'|'sms'
   card_id uuid null, -- reservado para Fase 2 (tarjetas)
-  reconciled_at timestamptz null, -- reservado para conciliación bancaria
+  reconciled_at timestamptz null, -- se usa desde Fase 1-C en ajustes de conciliación
   created_at timestamptz,
   updated_at timestamptz
 )
@@ -168,6 +169,49 @@ saldo = SUM(transactions.amount donde account_id = X y currency = misma moneda,
 ```
 
 (Decisión de implementación: calcular on-the-fly vs. cachear con trigger — evaluar en Fase 1 según performance real, no bloquea el diseño.)
+
+## Transferencias y tipos de transacción (Fase 1-C)
+
+Decisión del usuario: cerrar "integridad financiera" antes de Fase 2, para que el dashboard sea 100% confiable con dinero real. Cambios:
+
+### Esquema
+
+- `transactions.to_account_id` (uuid, null): cuenta destino. Requerido solo para `type in ('transfer', 'card_payment')`; debe ser `null` para el resto.
+- `transactions.type` amplía su check constraint: `'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment'`.
+- `accounts.type` amplía su check constraint: `'checking' | 'savings' | 'credit_card'`.
+- **Trigger de integridad** (`public.validate_transaction_accounts()`, `before insert or update on transactions`): valida en la base, no solo en la app —
+  - `account_id` pertenece a `household_id`.
+  - si `to_account_id` no es null: pertenece al mismo `household_id`, es distinto de `account_id`, y su moneda coincide con `currency` (no se modela conversión, ver "Moneda").
+  - `to_account_id` es obligatorio si `type in ('transfer','card_payment')`, y debe ser `null` en cualquier otro caso.
+
+  Esto no depende de RLS ni la reemplaza — es una capa adicional para que un bug de la app (o un insert directo) no pueda dejar datos financieros inconsistentes.
+
+### Semántica de cada tipo (confirmada con el usuario)
+
+| Tipo | Afecta saldo de `account_id` | Afecta saldo de `to_account_id` | Cuenta como ingreso | Cuenta como gasto |
+|---|---|---|---|---|
+| `income` | + | — | Sí | No |
+| `expense` | − | — | No | Sí |
+| `transfer` | − | + | No | No |
+| `card_payment` | − | + | No | No |
+| `refund` | + | — | **No** | **Resta** del gasto neto |
+| `adjustment` | + o − (signo del monto) | — | No | No |
+
+- **`card_payment`** existe como tipo propio (no un `transfer` genérico) para que los reportes lo puedan distinguir, pero se comporta exactamente igual a `transfer` en los cálculos. El destino debe ser una cuenta `type='credit_card'` (la UI filtra el selector). **Limitación conocida:** todavía no existe el módulo de Tarjetas (Fase 2) que registre las compras/deuda de la tarjeta — el saldo calculado de una cuenta `credit_card` hoy solo refleja los pagos hechos hacia ella, no lo gastado con ella. Se revisa cuando Fase 2 arranque.
+- **`refund`** no es un ingreso nuevo: resta de `monthlyExpense` (dashboard) y del "actual" de `useMonthlyActuals` (presupuesto vs. real) de su categoría — mismo criterio que un gasto que "no llegó a costar tanto". Sí aumenta el saldo de la cuenta (la plata vuelve de verdad).
+- **`adjustment`** es la única categoría donde `amount` puede ser negativo (corrección hacia abajo) — en todos los demás tipos se sigue guardando siempre positivo, con `type` marcando la dirección. Es lo que genera la conciliación básica (ver abajo). No lleva `category_id`.
+
+### Agregados (dashboard y presupuesto)
+
+- **A nivel moneda del household** (`use-dashboard-summary.ts`): `transfer`/`card_payment` se **ignoran por completo** — mueven plata entre 2 cuentas de la misma moneda (forzado por el trigger), así que su efecto neto sobre "saldo total en esa moneda" es matemáticamente cero. Esto es lo que garantiza los puntos 4 y 5 del pedido del usuario (no alteran ingresos/gastos, no duplican gasto) sin necesitar lógica especial de "exclusión" — simplemente nunca se suman.
+- `monthlyExpense[currency] = SUM(expense) - SUM(refund)` (ambos del mes).
+- `balance[currency] = SUM(income) - SUM(expense) + SUM(refund) + SUM(adjustment con signo)`.
+- **Por cuenta** (`use-account-balances.ts`, nuevo): sí necesita `to_account_id`, a diferencia del agregado por moneda — es la fórmula completa de la tabla de arriba, aplicada por cuenta. Se usa para mostrar el saldo en `/accounts` y para la conciliación.
+- **Presupuesto vs. real** (`use-budgets.ts` → `useMonthlyActuals`): `SUM(expense) - SUM(refund)` por categoría+moneda (antes solo sumaba `expense`).
+
+### Conciliación básica (punto 6)
+
+En `/accounts`, cada cuenta tiene una acción "Conciliar": el usuario ingresa el saldo real (el que le dice el banco), se muestra la diferencia contra el saldo calculado, y un botón crea una transacción `type='adjustment'` por esa diferencia (con `reconciled_at = now()` y descripción "Conciliación de saldo"). No es conciliación transacción-por-transacción (eso excede "básica" del roadmap) — es una corrección puntual al saldo total de la cuenta.
 
 ## Importación CSV (Fase 1-B)
 
@@ -193,6 +237,8 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 **⚠️ Regla obligatoria para cualquier hook de TanStack Query (`lib/hooks/*`):** el resultado de `queryFn` debe ser JSON-safe (objetos planos, arrays, strings, numbers — nunca `Map`, `Set`, o `Date` como valor de retorno). El `PersistQueryClientProvider` (`lib/providers/query-provider.tsx`) serializa toda la cache a JSON para guardarla en IndexedDB; un `Map` se convierte silenciosamente en `{}` al guardarse, y al hidratar el componente que espera un `Map` explota en runtime (bug real encontrado en Fase 1 construyendo `use-budgets.ts` — devolvía un `Map` y crasheaba la página al recargar). Usar `Record<string, T>` en vez de `Map` para cualquier tabla de totales/agregados cacheados.
 
 **⚠️ Regla obligatoria: toda queryKey debe incluir el userId (`useAuthUserId()` en `lib/hooks/use-auth-user-id.ts`), con `enabled: !!userId`.** Sin esto, si dos usuarios de households distintos usan el mismo navegador (común en desarrollo/testing, y posible en un dispositivo compartido), la cache persistida en IndexedDB de un usuario queda pegada bajo la misma queryKey y se le sirve al siguiente usuario que loguea — bug real encontrado en Fase 1 (household de un usuario mostrando datos vacíos/incorrectos heredados de otra sesión). El patrón: `queryKey: ["recurso", ...params, userId]` + `enabled: !!userId`. Ver cualquier hook en `lib/hooks/` como referencia.
+
+**⚠️ Regla obligatoria: una mutación debe invalidar TODAS las queries derivadas de la tabla que toca, no solo la que "obviamente" corresponde.** `useCreateTransaction`/`useUpdateTransaction`/`useDeleteTransaction` solo invalidaban `["transactions"]` — `["dashboard-summary"]`, `["monthly-actuals"]` y `["account-balances"]` (todas calculadas a partir de `transactions`) se quedaban con datos viejos. En la práctica parecía funcionar porque cambiar de página remonta el componente y, si `staleTime` (60s) ya expiró, dispara un refetch solo — un timing casual, no un diseño correcto. Se detectó al probar la conciliación (Fase 1-C) sin navegar fuera de `/accounts`: el saldo no se actualizaba después de crear el ajuste. Fix: una función `invalidateTransactionDerivedQueries()` en `use-transactions.ts` que invalida las 4 keys juntas, usada por las 3 mutaciones (y también por `useBulkCreateTransactions` en `use-csv-import.ts`). Antes de agregar una nueva query que lea de `transactions`, agregarla ahí también.
 
 ## Seguridad
 

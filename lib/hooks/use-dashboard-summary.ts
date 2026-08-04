@@ -23,6 +23,8 @@ export type DashboardSummary = {
   balance: CurrencyTotals;
 };
 
+// Ver architecture.md "Transferencias y tipos de transacción (Fase 1-C)"
+// para la tabla completa de qué tipo afecta qué.
 export function useDashboardSummary(month: string) {
   const userId = useAuthUserId();
 
@@ -51,25 +53,42 @@ export function useDashboardSummary(month: string) {
         const inMonth =
           row.transaction_date >= monthStart && row.transaction_date <= monthEnd;
 
-        if (row.type === "income") {
-          balance[row.currency] = (balance[row.currency] ?? 0) + amount;
-          if (inMonth) {
-            monthlyIncome[row.currency] =
-              (monthlyIncome[row.currency] ?? 0) + amount;
-          }
-        } else if (row.type === "expense") {
-          balance[row.currency] = (balance[row.currency] ?? 0) - amount;
-          if (inMonth) {
-            monthlyExpense[row.currency] =
-              (monthlyExpense[row.currency] ?? 0) + amount;
-          }
-        } else if (row.type === "transfer") {
-          // Simplificación Fase 1: el schema solo guarda un account_id por
-          // transacción (ver architecture.md), sin cuenta destino, así que no
-          // hay forma de saber si esta fila es el lado "entrada" o "salida"
-          // de la transferencia. Se trata como salida de la cuenta de origen.
-          // Revisar si Fase 2+ agrega conciliación entre cuentas.
-          balance[row.currency] = (balance[row.currency] ?? 0) - amount;
+        switch (row.type) {
+          case "income":
+            balance[row.currency] = (balance[row.currency] ?? 0) + amount;
+            if (inMonth) {
+              monthlyIncome[row.currency] =
+                (monthlyIncome[row.currency] ?? 0) + amount;
+            }
+            break;
+          case "expense":
+            balance[row.currency] = (balance[row.currency] ?? 0) - amount;
+            if (inMonth) {
+              monthlyExpense[row.currency] =
+                (monthlyExpense[row.currency] ?? 0) + amount;
+            }
+            break;
+          case "refund":
+            // Resta del gasto neto (no cuenta como ingreso nuevo), pero sí
+            // aumenta el saldo — la plata vuelve de verdad.
+            balance[row.currency] = (balance[row.currency] ?? 0) + amount;
+            if (inMonth) {
+              monthlyExpense[row.currency] =
+                (monthlyExpense[row.currency] ?? 0) - amount;
+            }
+            break;
+          case "adjustment":
+            // amount puede ser negativo acá (única excepción, ver
+            // architecture.md); no cuenta como ingreso ni gasto.
+            balance[row.currency] = (balance[row.currency] ?? 0) + amount;
+            break;
+          case "transfer":
+          case "card_payment":
+            // Se ignoran a propósito: mueven plata entre 2 cuentas de la
+            // misma moneda (forzado por el trigger de la base), así que su
+            // efecto neto sobre el saldo total en esa moneda es cero — no
+            // hace falta sumar/restar nada de ningún lado.
+            break;
         }
       }
 

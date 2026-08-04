@@ -13,8 +13,10 @@ export type TransactionWithRelations = {
   description: string | null;
   transaction_date: string;
   account_id: string;
+  to_account_id: string | null;
   category_id: string | null;
   accounts: { name: string } | null;
+  to_account: { name: string } | null;
   categories: { name: string } | null;
 };
 
@@ -31,7 +33,7 @@ export function useTransactions() {
       const { data, error } = await supabase
         .from("transactions")
         .select(
-          "id, type, amount, currency, description, transaction_date, account_id, category_id, accounts(name), categories(name)",
+          "id, type, amount, currency, description, transaction_date, account_id, to_account_id, category_id, accounts!transactions_account_id_fkey(name), to_account:accounts!transactions_to_account_id_fkey(name), categories(name)",
         )
         .order("transaction_date", { ascending: false })
         .order("created_at", { ascending: false });
@@ -40,6 +42,20 @@ export function useTransactions() {
       return data as unknown as TransactionWithRelations[];
     },
   });
+}
+
+// Toda mutación de transacciones invalida las 4 queries derivadas — no solo
+// "transactions". Antes solo invalidaba esa y las demás (dashboard-summary,
+// monthly-actuals, account-balances) quedaban con datos viejos hasta que
+// staleTime (60s) expirara solo; en la práctica parecían "andar bien" por
+// casualidad de timing entre pasos manuales, no porque estuviera bien armado
+// — se detectó al probar conciliación en el mismo `/accounts` sin navegar
+// (sin remount no hay refetch automático, así que el saldo quedaba viejo).
+function invalidateTransactionDerivedQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ["transactions"] });
+  queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+  queryClient.invalidateQueries({ queryKey: ["monthly-actuals"] });
+  queryClient.invalidateQueries({ queryKey: ["account-balances"] });
 }
 
 export function useCreateTransaction() {
@@ -59,9 +75,7 @@ export function useCreateTransaction() {
         .insert({ ...transaction, created_by: user.id });
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    },
+    onSuccess: () => invalidateTransactionDerivedQueries(queryClient),
   });
 }
 
@@ -79,9 +93,7 @@ export function useUpdateTransaction() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    },
+    onSuccess: () => invalidateTransactionDerivedQueries(queryClient),
   });
 }
 
@@ -96,8 +108,6 @@ export function useDeleteTransaction() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-    },
+    onSuccess: () => invalidateTransactionDerivedQueries(queryClient),
   });
 }

@@ -12,11 +12,19 @@ import {
   useUpdateAccount,
   type Account,
 } from "@/lib/hooks/use-accounts";
+import { useAccountBalances } from "@/lib/hooks/use-account-balances";
+import { useCreateTransaction } from "@/lib/hooks/use-transactions";
 import { CURRENCIES, ACCOUNT_TYPES as TYPES } from "@/lib/constants";
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function AccountsPage() {
   const { data: household } = useCurrentHousehold();
   const { data: accounts, isLoading } = useAccounts();
+  const { data: balances } = useAccountBalances();
   const createAccount = useCreateAccount();
 
   const [name, setName] = useState("");
@@ -113,7 +121,11 @@ export default function AccountsPage() {
         <ul className="space-y-3">
           {accounts.map((account: Account) => (
             <li key={account.id}>
-              <AccountRow account={account} />
+              <AccountRow
+                account={account}
+                balance={balances?.[account.id] ?? 0}
+                householdId={household?.household_id}
+              />
             </li>
           ))}
         </ul>
@@ -126,9 +138,18 @@ export default function AccountsPage() {
   );
 }
 
-function AccountRow({ account }: { account: Account }) {
+function AccountRow({
+  account,
+  balance,
+  householdId,
+}: {
+  account: Account;
+  balance: number;
+  householdId: string | undefined;
+}) {
   const updateAccount = useUpdateAccount();
   const deleteAccount = useDeleteAccount();
+  const createTransaction = useCreateTransaction();
 
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(account.name);
@@ -139,6 +160,10 @@ function AccountRow({ account }: { account: Account }) {
     account.type as (typeof TYPES)[number]["value"],
   );
   const [error, setError] = useState<string | null>(null);
+
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [realBalance, setRealBalance] = useState("");
+  const [reconcileError, setReconcileError] = useState<string | null>(null);
 
   function startEditing() {
     setName(account.name);
@@ -161,6 +186,34 @@ function AccountRow({ account }: { account: Account }) {
   async function handleDelete() {
     if (!confirm("¿Eliminar esta cuenta?")) return;
     await deleteAccount.mutateAsync(account.id);
+  }
+
+  const diff =
+    realBalance !== "" ? Number(realBalance) - balance : null;
+
+  async function handleReconcile() {
+    setReconcileError(null);
+    if (!householdId || diff === null) return;
+    try {
+      await createTransaction.mutateAsync({
+        household_id: householdId,
+        account_id: account.id,
+        to_account_id: null,
+        category_id: null,
+        type: "adjustment",
+        amount: diff,
+        currency: account.currency,
+        description: "Conciliación de saldo",
+        transaction_date: todayISO(),
+        reconciled_at: new Date().toISOString(),
+      });
+      setIsReconciling(false);
+      setRealBalance("");
+    } catch (err) {
+      setReconcileError(
+        err instanceof Error ? err.message : "Error al registrar el ajuste",
+      );
+    }
   }
 
   if (isEditing) {
@@ -213,22 +266,77 @@ function AccountRow({ account }: { account: Account }) {
   }
 
   return (
-    <Card className="flex items-center justify-between py-4">
-      <div>
-        <p className="text-on-surface font-medium">{account.name}</p>
-        <p className="text-on-surface-variant text-sm font-mono">
-          {account.currency} ·{" "}
-          {TYPES.find((t) => t.value === account.type)?.label ?? account.type}
-        </p>
+    <Card className="py-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-on-surface font-medium">{account.name}</p>
+          <p className="text-on-surface-variant text-sm font-mono">
+            {account.currency} ·{" "}
+            {TYPES.find((t) => t.value === account.type)?.label ?? account.type}
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-on-surface">
+            {balance.toFixed(2)} {account.currency}
+          </span>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setReconcileError(null);
+              setIsReconciling((v) => !v);
+            }}
+          >
+            Conciliar
+          </Button>
+          <Button variant="secondary" onClick={startEditing}>
+            Editar
+          </Button>
+          <Button variant="danger" onClick={handleDelete}>
+            Eliminar
+          </Button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <Button variant="secondary" onClick={startEditing}>
-          Editar
-        </Button>
-        <Button variant="danger" onClick={handleDelete}>
-          Eliminar
-        </Button>
-      </div>
+
+      {isReconciling && (
+        <div className="mt-4 pt-4 border-t border-outline-variant/20 flex flex-col gap-3">
+          <div>
+            <Label>Saldo según tu banco ({account.currency})</Label>
+            <Input
+              type="number"
+              step="0.01"
+              value={realBalance}
+              onChange={(e) => setRealBalance(e.target.value)}
+              placeholder={balance.toFixed(2)}
+            />
+          </div>
+          {diff !== null && diff !== 0 && (
+            <p className="text-sm text-on-surface-variant">
+              Diferencia: {diff > 0 ? "+" : ""}
+              {diff.toFixed(2)} {account.currency}
+            </p>
+          )}
+          {diff === 0 && (
+            <p className="text-sm text-secondary">Sin diferencia — no hace falta ajuste.</p>
+          )}
+          {reconcileError && (
+            <p className="text-sm text-error" role="alert">
+              {reconcileError}
+            </p>
+          )}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleReconcile}
+              disabled={diff === null || diff === 0 || createTransaction.isPending}
+            >
+              {createTransaction.isPending
+                ? "Guardando..."
+                : diff !== null
+                  ? `Registrar ajuste de ${diff > 0 ? "+" : ""}${diff.toFixed(2)}`
+                  : "Registrar ajuste"}
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

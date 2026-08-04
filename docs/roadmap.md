@@ -51,6 +51,29 @@ Probado en navegador: parseo, preview, un caso de duplicado detectado correctame
 
 ---
 
+## Fase 1-C — Integridad Financiera
+**Estado: técnicamente completa — quedan 2 puntos que dependen del usuario (1 y 7)**
+
+Decisión explícita del usuario: antes de Fase 2 (Tarjetas/Cashback), cerrar esta fase para que los números del dashboard sean confiables al 100% con dinero real. Alcance:
+
+1. [ ] Validar onboarding y Google Login con la cuenta real del usuario (pendiente del lado del usuario — no lo puedo completar yo).
+2. [x] Implementar transferencias entre cuentas (columna `to_account_id`, antes solo existía `account_id`).
+3. [x] Diferenciar 6 tipos de transacción: ingreso, gasto, transferencia, pago de tarjeta, devolución, ajuste.
+4. [x] Confirmar que transferencias no alteran ingresos ni gastos del dashboard — probado en navegador.
+5. [x] Confirmar que pagos de tarjeta no duplican el gasto (se tratan como transferencia, no como gasto nuevo) — probado en navegador.
+6. [x] Agregar conciliación básica de saldos (saldo calculado vs. saldo real declarado → genera un ajuste) — probado en navegador.
+7. [ ] Limpiar usuarios de prueba (`test-a`, `test-b`) cuando el usuario confirme que ya no los necesita.
+
+Probado también: trigger de integridad a nivel de base de datos rechaza (con curl directo, bypaseando RLS y la UI) transferencias con moneda distinta entre origen/destino, `to_account_id` faltante o presente donde no corresponde, y cuentas de otro household — ver `project_state.md` para el detalle de cada caso.
+
+**Decisiones de diseño (confirmadas con el usuario):**
+- **Devolución:** resta del gasto neto (dashboard y presupuesto vs. real), no cuenta como ingreso nuevo.
+- **Pago de tarjeta:** se agrega un tercer tipo de cuenta `credit_card` (junto a `checking`/`savings`). Un pago de tarjeta es una transferencia hacia una cuenta de ese tipo — mueve saldo, no es gasto. El seguimiento de compras/deuda de la tarjeta en sí (cashback, tope mensual) sigue siendo Fase 2; por ahora el saldo de una cuenta `credit_card` solo refleja los pagos hechos hacia ella.
+- **Ajuste:** corrección manual de saldo (puede ser positivo o negativo), no cuenta como ingreso ni gasto. Es lo que genera la conciliación básica del punto 6.
+- Ver `architecture.md` → "Transferencias y tipos de transacción (Fase 1-C)" para el diseño técnico completo (schema, validación de integridad, fórmulas de agregación).
+
+---
+
 ## Fase 2 — Tarjetas y Cashback
 **Estado: no iniciada**
 

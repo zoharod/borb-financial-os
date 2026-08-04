@@ -191,6 +191,7 @@ export type Database = {
           reconciled_at: string | null
           source: string
           status: string
+          to_account_id: string | null
           transaction_date: string
           type: string
           updated_at: string
@@ -209,6 +210,7 @@ export type Database = {
           reconciled_at?: string | null
           source?: string
           status?: string
+          to_account_id?: string | null
           transaction_date: string
           type: string
           updated_at?: string
@@ -227,6 +229,7 @@ export type Database = {
           reconciled_at?: string | null
           source?: string
           status?: string
+          to_account_id?: string | null
           transaction_date?: string
           type?: string
           updated_at?: string
@@ -251,6 +254,13 @@ export type Database = {
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_to_account_id_fkey"
+            columns: ["to_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
             referencedColumns: ["id"]
           },
         ]

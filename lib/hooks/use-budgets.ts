@@ -61,18 +61,21 @@ export function useMonthlyActuals(month: string) {
 
       const { data, error } = await supabase
         .from("transactions")
-        .select("category_id, currency, amount")
-        .eq("type", "expense")
+        .select("category_id, currency, amount, type")
+        .in("type", ["expense", "refund"])
         .gte("transaction_date", monthStart)
         .lte("transaction_date", monthEnd);
 
       if (error) throw error;
 
+      // Una devolución resta del gasto real de su categoría (ver
+      // architecture.md) — no es que "no cuente", es que reduce lo gastado.
       const totals: Record<string, number> = {};
       for (const row of data) {
         if (!row.category_id) continue;
         const key = `${row.category_id}:${row.currency}`;
-        totals[key] = (totals[key] ?? 0) + Number(row.amount);
+        const delta = row.type === "refund" ? -Number(row.amount) : Number(row.amount);
+        totals[key] = (totals[key] ?? 0) + delta;
       }
       return totals;
     },

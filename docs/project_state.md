@@ -2,8 +2,8 @@
 
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
-**Última actualización:** 2026-08-03
-**Fase actual:** Fase 1-B completa ✅ + registro real con Google Auth agregado — lista para uso real o para Fase 2
+**Última actualización:** 2026-08-04
+**Fase actual:** Fase 1-C técnicamente completa ✅ — quedan 2 puntos que dependen del usuario (confirmar login real, borrar usuarios de prueba)
 
 ---
 
@@ -47,16 +47,26 @@
   - **Probado:** login con `test-b` (ya tenía household) sigue funcionando sin pasar por el onboarding. El botón "Continuar con Google" redirige correctamente a la pantalla real de Google mostrando "continuar a Borb Financial OS" y la cuenta del usuario.
 - [x] **Bug encontrado y corregido: login con Google terminaba en pantalla en blanco (`localhost:3000/?code=...`).** El `site_url` de Supabase estaba en `http://localhost:3000` y `uri_allow_list` vacío — Supabase solo permite redirigir a URLs en esa lista, así que rechazaba nuestro `redirectTo` (`/auth/callback`) y caía al `site_url` a secas, dejando el `code` colgado en la raíz sin que nadie lo consumiera. Fix: `site_url` → `https://borb-financial-os.vercel.app`, `uri_allow_list` → `http://localhost:3000/**,https://borb-financial-os.vercel.app/**` (vía Management API). Pendiente que el usuario confirme el login completo de punta a punta con su cuenta real (yo solo puedo verificar hasta la pantalla de selección de cuenta de Google, no debo completarlo con su contraseña).
 - [x] **Onboarding ampliado a wizard de 3 pasos (feedback del usuario: "un mejor onboarding... para que sea intuitivo qué información ir subiendo").** `components/household-guard.tsx` (solo pedía nombre del hogar) reemplazado por `components/onboarding-guard.tsx`: Paso 1 hogar → Paso 2 primera cuenta → Paso 3 categorías (chips de sugeridas: Comida, Transporte, Vivienda, Servicios, Salud, Entretenimiento, Extras/Imprevistos, + input libre; al menos 1 para avanzar). Presupuesto queda fuera del wizard a propósito (no es prerequisito de nada, su propia página ya lo resuelve). Nuevo `lib/constants.ts` centraliza `CURRENCIES`/`ACCOUNT_TYPES`/`SUGGESTED_CATEGORIES` (reusado por `/accounts`, `/budgets` y el wizard). Probado de punta a punta con un usuario de prueba temporal: los 3 pasos crean los datos correctamente y termina en el dashboard normal.
+- [x] **Fase 1-C — Integridad Financiera, pedida explícitamente por el usuario antes de arrancar Fase 2.** Alcance completo (puntos 2 al 6 del pedido; 1 y 7 dependen del usuario, ver abajo):
+  - **Schema** (migración `20260804101156`): `accounts.type` ahora acepta `credit_card` (además de `checking`/`savings`); `transactions.to_account_id` (nuevo, cuenta destino de transfer/card_payment); `transactions.type` ahora acepta `card_payment`, `refund`, `adjustment` (además de `income`/`expense`/`transfer`).
+  - **Trigger de integridad** `public.validate_transaction_accounts()`: valida en la base (no solo en la app) que `account_id`/`to_account_id` pertenezcan al `household_id` de la transacción, que sean cuentas distintas, que sus monedas coincidan, y que `to_account_id` esté presente solo cuando el tipo lo requiere. **Probado con curl directo (bypaseando RLS y la UI):** los 4 casos inválidos (moneda distinta, `to_account_id` faltante, `to_account_id` sobrando, cuenta de otro household) fueron rechazados correctamente por la base.
+  - **Semántica confirmada con el usuario:** devolución resta del gasto neto (no es ingreso nuevo); pago de tarjeta se comporta como transferencia (no duplica gasto) hacia una cuenta `credit_card`; ajuste es la única transacción con monto potencialmente negativo, no cuenta como ingreso ni gasto.
+  - **Nuevo hook `use-account-balances.ts`**: saldo real por cuenta (a diferencia de `use-dashboard-summary.ts`, que agrega por moneda a nivel household y por eso puede ignorar transfer/card_payment ya que se cancelan matemáticamente — el saldo por cuenta sí necesita `to_account_id`).
+  - **`/accounts` ahora muestra el saldo calculado de cada cuenta** y tiene una acción "Conciliar": el usuario ingresa el saldo real (según el banco), ve la diferencia, y un botón crea una transacción `type='adjustment'` por esa diferencia con `reconciled_at = now()`.
+  - **Bug encontrado y corregido: ninguna mutación de transacciones invalidaba `dashboard-summary`/`monthly-actuals`/`account-balances`, solo `transactions`.** Se detectó probando la conciliación sin navegar fuera de `/accounts` (sin remount de página no hay refetch automático, así que el saldo mostrado quedaba viejo después de crear el ajuste, aunque el ajuste sí se había guardado bien en la base). Los tests anteriores de transfer/card_payment/refund habían "pasado" por casualidad de timing (`staleTime` de 60s ya vencido al momento de revisar, después de navegar entre páginas), no porque la invalidación estuviera bien armada. Fix: `invalidateTransactionDerivedQueries()` en `use-transactions.ts`, usada por las 3 mutaciones y por `useBulkCreateTransactions` (CSV import). Ver regla nueva en `architecture.md`.
+  - **Probado en navegador de punta a punta** con 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) en Casa Test B: transferencia (dashboard sin cambios ✓), pago de tarjeta (sin duplicar gasto ✓), devolución (resta 100 de "Gastos del mes" y del presupuesto de Comida ✓), ajuste vía conciliación (+20.50 y luego -50, saldo actualizado en vivo tras el fix ✓).
 
 ## 🔄 En progreso
 
-- Pendiente que el usuario confirme el login con Google de punta a punta con su cuenta real (después del fix de `uri_allow_list`) — yo no puedo completarlo por él.
+- **Punto 1 (validar onboarding + Google Login):** pendiente que el usuario confirme el login completo de punta a punta con su cuenta real — no lo puedo completar yo.
+- **Punto 7 (limpiar usuarios de prueba):** pendiente que el usuario confirme que ya no los necesita antes de borrarlos.
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Confirmar con el usuario que el login con Google + wizard de onboarding funcionan completo con su cuenta real.
-2. Decidir: ¿Fase 2 (Tarjetas y Cashback) o seguir puliendo Fase 1/1-B (ej. resolver semántica de `transfer` con 2 cuentas, mapeo de columnas más flexible para CSV)?
-3. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción) con datos de ejemplo en Casa Test B — no afectan al household real del usuario (aislados por RLS), pero borrarlos en algún momento si molesta tenerlos.
+1. Confirmar con el usuario que el login con Google + wizard de onboarding funcionan completo con su cuenta real (punto 1 de Fase 1-C).
+2. Preguntarle al usuario si ya quiere que borre los usuarios de prueba (punto 7 de Fase 1-C) — con eso Fase 1-C queda 100% cerrada.
+3. Decidir: ¿Fase 2 (Tarjetas y Cashback, ahora con más base real gracias a la cuenta `credit_card`) u otra cosa?
+4. Los 2 usuarios/households de prueba (`test-a@borb.test` / `test-b@borb.test`, password `TestPass123!`) quedan en la base (local y producción). Casa Test B ahora tiene 3 cuentas (Ahorro L, Efectivo, Tarjeta Visa) y varias transacciones de los 6 tipos, usadas para probar Fase 1-C.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 

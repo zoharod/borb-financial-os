@@ -17,16 +17,34 @@ import {
 } from "@/lib/hooks/use-transactions";
 import type { Account } from "@/lib/hooks/use-accounts";
 import type { Category } from "@/lib/hooks/use-categories";
+import { TRANSACTION_TYPES as TYPES, TRANSFER_LIKE_TYPES } from "@/lib/constants";
 
-const TYPES = [
-  { value: "expense", label: "Gasto" },
-  { value: "income", label: "Ingreso" },
-  { value: "transfer", label: "Transferencia" },
-] as const;
+type TxType = (typeof TYPES)[number]["value"];
+
+function isTransferLike(type: string): type is (typeof TRANSFER_LIKE_TYPES)[number] {
+  return (TRANSFER_LIKE_TYPES as readonly string[]).includes(type);
+}
 
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Cuentas válidas como destino de una transferencia/pago de tarjeta: misma
+// moneda (no hay conversión, ver architecture.md), distinta de la cuenta de
+// origen, y si es pago de tarjeta, filtrado a cuentas tipo "Tarjeta de crédito".
+function destinationOptions(
+  accounts: Account[],
+  fromAccountId: string,
+  type: TxType,
+) {
+  const from = accounts.find((a) => a.id === fromAccountId);
+  return accounts.filter((a) => {
+    if (a.id === fromAccountId) return false;
+    if (from && a.currency !== from.currency) return false;
+    if (type === "card_payment" && a.type !== "credit_card") return false;
+    return true;
+  });
 }
 
 export default function TransactionsPage() {
@@ -36,13 +54,16 @@ export default function TransactionsPage() {
   const { data: transactions, isLoading } = useTransactions();
   const createTransaction = useCreateTransaction();
 
-  const [type, setType] = useState<(typeof TYPES)[number]["value"]>("expense");
+  const [type, setType] = useState<TxType>("expense");
   const [accountId, setAccountId] = useState("");
+  const [toAccountId, setToAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayISO());
   const [error, setError] = useState<string | null>(null);
+
+  const isTransfer = isTransferLike(type);
 
   const selectedAccount = useMemo(
     () => accounts?.find((a) => a.id === accountId),
@@ -52,6 +73,11 @@ export default function TransactionsPage() {
   const defaultExtraCategory = useMemo(
     () => categories?.find((c) => c.is_extra_default),
     [categories],
+  );
+
+  const destinationAccounts = useMemo(
+    () => destinationOptions(accounts ?? [], accountId, type),
+    [accounts, accountId, type],
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -66,6 +92,10 @@ export default function TransactionsPage() {
       setError("Elegí una cuenta.");
       return;
     }
+    if (isTransfer && !toAccountId) {
+      setError("Elegí la cuenta destino.");
+      return;
+    }
 
     const resolvedCategoryId =
       categoryId ||
@@ -76,7 +106,8 @@ export default function TransactionsPage() {
       await createTransaction.mutateAsync({
         household_id: household.household_id,
         account_id: selectedAccount.id,
-        category_id: resolvedCategoryId,
+        to_account_id: isTransfer ? toAccountId : null,
+        category_id: isTransfer ? null : resolvedCategoryId,
         type,
         amount: Number(amount),
         currency: selectedAccount.currency,
@@ -85,6 +116,7 @@ export default function TransactionsPage() {
       });
       setAmount("");
       setDescription("");
+      setToAccountId("");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al registrar la transacción",
@@ -120,9 +152,10 @@ export default function TransactionsPage() {
                 <Label>Tipo</Label>
                 <Select
                   value={type}
-                  onChange={(e) =>
-                    setType(e.target.value as (typeof TYPES)[number]["value"])
-                  }
+                  onChange={(e) => {
+                    setType(e.target.value as TxType);
+                    setToAccountId("");
+                  }}
                 >
                   {TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -144,11 +177,14 @@ export default function TransactionsPage() {
 
             <div className="flex gap-4">
               <div className="flex-1">
-                <Label>Cuenta</Label>
+                <Label>{isTransfer ? "Cuenta de origen" : "Cuenta"}</Label>
                 <Select
                   required
                   value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
+                  onChange={(e) => {
+                    setAccountId(e.target.value);
+                    setToAccountId("");
+                  }}
                 >
                   <option value="">Elegir...</option>
                   {accounts?.map((a) => (
@@ -163,7 +199,7 @@ export default function TransactionsPage() {
                 <Input
                   type="number"
                   step="0.01"
-                  min="0"
+                  min={type === "adjustment" ? undefined : "0"}
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -171,25 +207,54 @@ export default function TransactionsPage() {
               </div>
             </div>
 
-            <div>
-              <Label>Categoría (opcional)</Label>
-              <Select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-              >
-                <option value="">
-                  Sin categoría
-                  {defaultExtraCategory && type === "expense"
-                    ? ` (se usa "${defaultExtraCategory.name}")`
-                    : ""}
-                </option>
-                {categories?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+            {isTransfer && (
+              <div>
+                <Label>
+                  {type === "card_payment" ? "Tarjeta a pagar" : "Cuenta destino"}
+                </Label>
+                <Select
+                  required
+                  value={toAccountId}
+                  onChange={(e) => setToAccountId(e.target.value)}
+                >
+                  <option value="">Elegir...</option>
+                  {destinationAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.currency})
+                    </option>
+                  ))}
+                </Select>
+                {accountId && destinationAccounts.length === 0 && (
+                  <p className="text-on-surface-variant text-xs mt-1">
+                    {type === "card_payment"
+                      ? 'No hay ninguna cuenta tipo "Tarjeta de crédito" en esta moneda todavía.'
+                      : "No hay otra cuenta en la misma moneda todavía."}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!isTransfer && (
+              <div>
+                <Label>Categoría (opcional)</Label>
+                <Select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                >
+                  <option value="">
+                    Sin categoría
+                    {defaultExtraCategory && type === "expense"
+                      ? ` (se usa "${defaultExtraCategory.name}")`
+                      : ""}
                   </option>
-                ))}
-              </Select>
-            </div>
+                  {categories?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
 
             <div>
               <Label>Descripción (opcional)</Label>
@@ -248,24 +313,31 @@ function TransactionRow({
   const deleteTransaction = useDeleteTransaction();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [type, setType] = useState<(typeof TYPES)[number]["value"]>(
-    tx.type as (typeof TYPES)[number]["value"],
-  );
+  const [type, setType] = useState<TxType>(tx.type as TxType);
   const [accountId, setAccountId] = useState(tx.account_id);
+  const [toAccountId, setToAccountId] = useState(tx.to_account_id ?? "");
   const [categoryId, setCategoryId] = useState(tx.category_id ?? "");
   const [amount, setAmount] = useState(String(tx.amount));
   const [description, setDescription] = useState(tx.description ?? "");
   const [date, setDate] = useState(tx.transaction_date);
   const [error, setError] = useState<string | null>(null);
 
+  const isTransfer = isTransferLike(type);
+
   const selectedAccount = useMemo(
     () => accounts.find((a) => a.id === accountId),
     [accounts, accountId],
   );
 
+  const destinationAccounts = useMemo(
+    () => destinationOptions(accounts, accountId, type),
+    [accounts, accountId, type],
+  );
+
   function startEditing() {
-    setType(tx.type as (typeof TYPES)[number]["value"]);
+    setType(tx.type as TxType);
     setAccountId(tx.account_id);
+    setToAccountId(tx.to_account_id ?? "");
     setCategoryId(tx.category_id ?? "");
     setAmount(String(tx.amount));
     setDescription(tx.description ?? "");
@@ -280,11 +352,16 @@ function TransactionRow({
       setError("Elegí una cuenta.");
       return;
     }
+    if (isTransfer && !toAccountId) {
+      setError("Elegí la cuenta destino.");
+      return;
+    }
     try {
       await updateTransaction.mutateAsync({
         id: tx.id,
         account_id: selectedAccount.id,
-        category_id: categoryId || null,
+        to_account_id: isTransfer ? toAccountId : null,
+        category_id: isTransfer ? null : categoryId || null,
         type,
         amount: Number(amount),
         currency: selectedAccount.currency,
@@ -309,9 +386,10 @@ function TransactionRow({
           <div className="flex gap-3">
             <Select
               value={type}
-              onChange={(e) =>
-                setType(e.target.value as (typeof TYPES)[number]["value"])
-              }
+              onChange={(e) => {
+                setType(e.target.value as TxType);
+                setToAccountId("");
+              }}
             >
               {TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -329,7 +407,10 @@ function TransactionRow({
           <div className="flex gap-3">
             <Select
               value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
+              onChange={(e) => {
+                setAccountId(e.target.value);
+                setToAccountId("");
+              }}
             >
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>
@@ -340,23 +421,41 @@ function TransactionRow({
             <Input
               type="number"
               step="0.01"
-              min="0"
+              min={type === "adjustment" ? undefined : "0"}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
 
-          <Select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-          >
-            <option value="">Sin categoría</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+          {isTransfer && (
+            <Select
+              value={toAccountId}
+              onChange={(e) => setToAccountId(e.target.value)}
+            >
+              <option value="">
+                {type === "card_payment" ? "Tarjeta a pagar..." : "Cuenta destino..."}
               </option>
-            ))}
-          </Select>
+              {destinationAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({a.currency})
+                </option>
+              ))}
+            </Select>
+          )}
+
+          {!isTransfer && (
+            <Select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">Sin categoría</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          )}
 
           <Input
             value={description}
@@ -383,25 +482,31 @@ function TransactionRow({
     );
   }
 
+  const isPositive =
+    tx.type === "income" || tx.type === "refund" || (tx.type === "adjustment" && tx.amount >= 0);
+  const sign = tx.type === "adjustment" ? (tx.amount < 0 ? "-" : "+") : isPositive ? "+" : "-";
+  const typeLabel = TYPES.find((t) => t.value === tx.type)?.label ?? tx.type;
+
   return (
     <Card className="flex items-center justify-between py-4">
       <div>
         <p className="text-on-surface font-medium">
-          {tx.description || tx.categories?.name || "Sin descripción"}
+          {tx.description || tx.categories?.name || typeLabel}
         </p>
         <p className="text-on-surface-variant text-sm font-mono">
           {tx.transaction_date} · {tx.accounts?.name}
+          {tx.to_account?.name ? ` → ${tx.to_account.name}` : ""}
           {tx.categories?.name ? ` · ${tx.categories.name}` : ""}
         </p>
       </div>
       <div className="flex items-center gap-4">
         <span
           className={`font-mono font-semibold ${
-            tx.type === "income" ? "text-secondary" : "text-on-surface"
+            isPositive ? "text-secondary" : "text-on-surface"
           }`}
         >
-          {tx.type === "expense" ? "-" : "+"}
-          {tx.amount} {tx.currency}
+          {sign}
+          {Math.abs(tx.amount)} {tx.currency}
         </span>
         <Button variant="secondary" onClick={startEditing}>
           Editar
