@@ -12,12 +12,7 @@ import {
   useUpdateAccount,
   type Account,
 } from "@/lib/hooks/use-accounts";
-
-const CURRENCIES = ["HNL", "USD"] as const;
-const TYPES = [
-  { value: "checking", label: "Cuenta corriente" },
-  { value: "savings", label: "Ahorro" },
-] as const;
+import { CURRENCIES, ACCOUNT_TYPES as TYPES } from "@/lib/constants";
 
 export default function AccountsPage() {
   const { data: household } = useCurrentHousehold();

@@ -81,7 +81,15 @@ grant execute on function public.create_household_for_current_user(text) to auth
 ```
 
 - **`use-current-household.ts` usa `.maybeSingle()`, no `.single()`** — con `.single()`, 0 filas es un error (`PGRST116`); un usuario recién logueado sin household todavía necesita que esto devuelva `null` limpiamente, no que explote.
-- **`components/household-guard.tsx`** (client component, envuelve `{children}` en `app/(dashboard)/layout.tsx`): mientras carga `useCurrentHousehold()` muestra un spinner; si no hay household, muestra un formulario "Nombrá tu hogar" que llama a la función de arriba vía `supabase.rpc(...)`; si ya hay household, renderiza el contenido normal.
+- **`components/onboarding-guard.tsx`** (client component, envuelve `{children}` en `app/(dashboard)/layout.tsx`) es un wizard de 3 pasos, no solo "crear household" — dejar a un usuario nuevo en un dashboard completamente vacío sin pistas de qué cargar primero resultó confuso (feedback real del usuario). Orden de los pasos sigue las dependencias reales del modelo de datos (una transacción necesita cuenta; un presupuesto necesita categoría):
+  1. **Household** — nombre del hogar → `create_household_for_current_user`.
+  2. **Primera cuenta** — mismo form que `/accounts`, pero mínimo (sin lista).
+  3. **Categorías** — chips de sugeridas (`SUGGESTED_CATEGORIES` en `lib/constants.ts`: Comida, Transporte, Vivienda, Servicios, Salud, Entretenimiento, + Extras/Imprevistos marcada `is_extra_default`) más un input libre; un click por chip la crea al toque. Requiere al menos 1 para avanzar.
+  4. Con household + ≥1 cuenta + ≥1 categoría, renderiza `{children}` (la app normal).
+
+  Presupuesto queda afuera del wizard a propósito — no es prerequisito de nada más y su propia página (`/budgets`) ya lo resuelve bien; forzarlo acá sería fricción sin beneficio.
+
+  `lib/constants.ts` centraliza `CURRENCIES`, `ACCOUNT_TYPES` y `SUGGESTED_CATEGORIES` porque el wizard reutiliza los mismos valores que `/accounts` y `/budgets` — evita que las opciones queden inconsistentes si se agrega una moneda o un tipo de cuenta nuevo.
 
 ## Esquema de base de datos — Fase 1
 
@@ -189,7 +197,7 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 ## Seguridad
 
 - RLS en todas las tablas desde el día 1 — ver patrón obligatorio en "Multi-tenancy" arriba.
-- Auth vía Supabase Auth (email/password en Fase 1).
+- Auth vía Supabase Auth: email/password (usuarios de prueba) + Google OAuth (usuarios reales, ver "Registro / Onboarding").
 - Service role key solo en server-side (env vars de Vercel), nunca en cliente.
 - Supabase emite dos formatos de key equivalentes; usamos el nuevo (`sb_publishable_...` / `sb_secret_...`) en vez del legacy JWT (`anon` / `service_role`):
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = key `sb_publishable_...` (pública, cliente).
@@ -207,23 +215,26 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 ```
 /proxy.ts                     ✅ sesión/redirect (ver "Sesión / Auth")
 /app
-  /(auth)/login                ✅
-  /(dashboard)/layout.tsx      ✅ (guard de auth + header + nav)
+  /(auth)/login                ✅ email/password + botón Google
+  /auth/callback/route.ts      ✅ intercambia code OAuth por sesión
+  /(dashboard)/layout.tsx      ✅ (guard de auth + header + nav + OnboardingGuard)
   /(dashboard)/dashboard       ✅ Fase 1
   /(dashboard)/accounts        ✅ Fase 1 (CRUD + edición inline)
   /(dashboard)/transactions    ✅ Fase 1 (CRUD + edición inline)
-  /(dashboard)/transactions/import — Fase 1-B, importación CSV
+  /(dashboard)/transactions/import ✅ Fase 1-B, importación CSV
   /(dashboard)/budgets         ✅ Fase 1
   /(dashboard)/categories      ✅ Fase 1 (CRUD + edición inline)
 /components
   sign-out-button.tsx          ✅
-  nav-links.tsx                 ✅
+  nav-links.tsx                ✅
+  onboarding-guard.tsx         ✅ wizard de 3 pasos para usuarios nuevos
   /ui                          ✅ Fase 1 (Button, Input, Select, Card)
 /lib
+  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, SUGGESTED_CATEGORIES
   /supabase                    ✅ client.ts / server.ts / middleware.ts
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
   /hooks                       ✅ Fase 1, React Query hooks (uno por recurso + use-auth-user-id.ts)
-  csv.ts                        — Fase 1-B, parseo de CSV (papaparse)
+  csv.ts                        ✅ Fase 1-B, parseo de CSV (papaparse)
 /types
   supabase.ts                  ✅ generado con `supabase gen types typescript --linked`
 /supabase

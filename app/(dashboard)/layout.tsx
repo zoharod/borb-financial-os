@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/sign-out-button";
 import { NavLinks } from "@/components/nav-links";
-import { HouseholdGuard } from "@/components/household-guard";
+import { OnboardingGuard } from "@/components/onboarding-guard";
 
 export default async function DashboardLayout({
   children,
@@ -28,7 +28,7 @@ export default async function DashboardLayout({
         <SignOutButton />
       </header>
       <main className="flex-1 p-6 flex flex-col">
-        <HouseholdGuard>{children}</HouseholdGuard>
+        <OnboardingGuard>{children}</OnboardingGuard>
       </main>
     </div>
   );

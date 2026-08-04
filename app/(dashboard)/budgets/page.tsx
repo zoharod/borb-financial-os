@@ -12,8 +12,7 @@ import {
   useDeleteBudget,
   useMonthlyActuals,
 } from "@/lib/hooks/use-budgets";
-
-const CURRENCIES = ["HNL", "USD"] as const;
+import { CURRENCIES } from "@/lib/constants";
 
 function currentMonthISO() {
   const d = new Date();
