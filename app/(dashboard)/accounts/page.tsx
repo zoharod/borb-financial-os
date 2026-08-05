@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input, Select, Label } from "@/components/ui/input";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import {
@@ -56,7 +57,10 @@ export default function AccountsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-on-surface mb-6">Cuentas</h1>
+      <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-6 flex items-center gap-2">
+        <Icon name="account_balance_wallet" className="text-primary" filled />
+        Cuentas
+      </h1>
 
       <Card className="mb-6">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -265,15 +269,29 @@ function AccountRow({
     );
   }
 
+  const ACCOUNT_ICONS: Record<string, string> = {
+    checking: "account_balance",
+    savings: "savings",
+    credit_card: "credit_card",
+  };
+
   return (
     <Card className="py-4">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-on-surface font-medium">{account.name}</p>
-          <p className="text-on-surface-variant text-sm font-mono">
-            {account.currency} ·{" "}
-            {TYPES.find((t) => t.value === account.type)?.label ?? account.type}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary-container/20 flex items-center justify-center border border-primary/20 flex-shrink-0">
+            <Icon
+              name={ACCOUNT_ICONS[account.type] ?? "account_balance_wallet"}
+              className="text-primary"
+            />
+          </div>
+          <div>
+            <p className="text-on-surface font-medium">{account.name}</p>
+            <p className="text-on-surface-variant text-sm">
+              {account.currency} ·{" "}
+              {TYPES.find((t) => t.value === account.type)?.label ?? account.type}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="font-mono text-on-surface">

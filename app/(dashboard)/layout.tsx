@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { SignOutButton } from "@/components/sign-out-button";
-import { NavLinks } from "@/components/nav-links";
+import { Sidebar } from "@/components/sidebar";
+import { Topbar } from "@/components/topbar";
 import { OnboardingGuard } from "@/components/onboarding-guard";
 
 export default async function DashboardLayout({
@@ -19,17 +19,14 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="flex items-center justify-between border-b border-outline-variant/20 px-6 py-4 gap-6">
-        <span className="font-semibold text-on-surface whitespace-nowrap">
-          Borb Financial OS
-        </span>
-        <NavLinks />
-        <SignOutButton />
-      </header>
-      <main className="flex-1 p-6 flex flex-col">
-        <OnboardingGuard>{children}</OnboardingGuard>
-      </main>
+    <div className="min-h-full flex">
+      <Sidebar />
+      <div className="flex-1 md:ml-64 min-h-screen flex flex-col relative">
+        <Topbar />
+        <main className="flex-1 pt-16 p-4 md:p-6 flex flex-col max-w-[1600px] w-full mx-auto">
+          <OnboardingGuard>{children}</OnboardingGuard>
+        </main>
+      </div>
     </div>
   );
 }

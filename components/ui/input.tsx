@@ -1,7 +1,7 @@
 import { InputHTMLAttributes, SelectHTMLAttributes } from "react";
 
 const FIELD_CLASSES =
-  "w-full rounded-sm bg-surface-container-lowest px-3 py-2 text-on-surface shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-secondary/30";
+  "w-full rounded-full bg-surface-container-high border border-outline-variant/50 px-4 py-2 text-on-surface placeholder:text-on-surface-variant outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   const { className = "", ...rest } = props;

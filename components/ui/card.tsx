@@ -6,10 +6,6 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div
-      className={`rounded-lg bg-surface-container p-6 border border-outline-variant/20 ${className}`}
-    >
-      {children}
-    </div>
+    <div className={`glass-panel rounded-lg p-6 ${className}`}>{children}</div>
   );
 }

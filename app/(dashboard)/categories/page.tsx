@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input, Label } from "@/components/ui/input";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import {
@@ -48,7 +49,8 @@ export default function CategoriesPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-on-surface mb-6">
+      <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-6 flex items-center gap-2">
+        <Icon name="sell" className="text-primary" filled />
         Categorías
       </h1>
 

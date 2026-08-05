@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input, Select, Label } from "@/components/ui/input";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import { useAccounts } from "@/lib/hooks/use-accounts";
@@ -129,7 +130,8 @@ export default function TransactionsPage() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-xl font-semibold text-on-surface">
+        <h1 className="text-2xl font-bold text-on-surface tracking-tight flex items-center gap-2">
+          <Icon name="swap_horiz" className="text-primary" filled />
           Transacciones
         </h1>
         <Link

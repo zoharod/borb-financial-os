@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input, Select, Label } from "@/components/ui/input";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import { useCategories } from "@/lib/hooks/use-categories";
@@ -71,7 +72,8 @@ export default function BudgetsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-xl font-semibold text-on-surface mb-6">
+      <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-6 flex items-center gap-2">
+        <Icon name="savings" className="text-primary" filled />
         Presupuesto
       </h1>
 
@@ -81,7 +83,7 @@ export default function BudgetsPage() {
           type="month"
           value={month.slice(0, 7)}
           onChange={(e) => setMonth(`${e.target.value}-01`)}
-          className="rounded-sm bg-surface-container-lowest px-3 py-2 text-on-surface shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-secondary/30"
+          className="rounded-full bg-surface-container-high border border-outline-variant/50 px-4 py-2 text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
         />
       </div>
 

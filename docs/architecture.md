@@ -110,6 +110,67 @@ El wizard original (household → 1 cuenta → categorías) asumía una sola cue
 - **En el MVP (ya implementado):** los 5 pasos completos, cuentas y tarjetas repetibles, saldo inicial vía `adjustment`, tarjetas con soporte de 2 monedas, presupuesto con monto+moneda por categoría, revisión editable, persistencia de progreso.
 - **Preparado en el schema pero sin UI de extracción todavía:** todos los campos de `cards` que un parser de estado de cuenta necesitaría (banco, últimos 4, tarjetahabiente, día de corte, día de pago, pago mínimo, pago de contado, límite) ya existen como columnas nullable — activar la extracción real (PDF/imagen → estos campos, mostrados siempre para revisión antes de guardar, nunca guardado silencioso) es una fase futura que **no requiere otra migración**, solo la lógica de parseo + una UI de confirmación/corrección.
 
+## Usuarios, roles e invitaciones al hogar
+
+Pedido explícito del usuario: hasta acá, "Borb" no tenía ninguna forma de agregar a la segunda persona del hogar más que crear un usuario de prueba a mano vía API — no había perfil, ni roles reales (`household_members.role` solo distinguía `owner`/`member` sin que la RLS tratara ambos distinto), ni invitaciones, ni configuración de ningún tipo. Se agregó todo esto sin tocar el modelo financiero (`transactions` sigue siendo la única fuente de verdad).
+
+### Perfil (`profiles`)
+
+Tabla 1:1 con `auth.users`, poblada automáticamente por un trigger `on auth.users insert` (`public.handle_new_user()`) — así cualquier camino de alta (Google OAuth, email/password, invitación aceptada) tiene fila desde el primer momento sin depender de que la app la cree a mano. Guarda solo preferencias propias de la app (`full_name`, `avatar_url`, `preferred_language`, `timezone`, `date_format`, `number_format`, `preferred_currency`) — **nunca duplica** email/password, que siguen siendo de Supabase Auth. Cambiar el email pasa por `supabase.auth.updateUser({email})`, que ya maneja la confirmación por correo nativamente (no hay lógica propia de confirmación).
+
+### Roles de hogar
+
+`household_members.role` amplía su check constraint de `owner|member` a **`owner | admin | member | viewer`**. Semántica (simplificada para el MVP, pero la RLS ya distingue los 4 niveles, no hace falta otra migración para endurecerla después):
+
+| Rol | Lee datos financieros | Escribe datos financieros | Invita / gestiona miembros | Config. del hogar | Transferir propiedad / eliminar hogar |
+|---|---|---|---|---|---|
+| `owner` | Sí | Sí | Sí | Sí | Sí |
+| `admin` | Sí | Sí | Sí | Sí | No |
+| `member` | Sí | Sí | No | No | No |
+| `viewer` | Sí | **No** | No | No | No |
+
+**Función helper `public.user_household_role(household_id)`** (`SECURITY DEFINER`, mismo patrón que `user_household_ids()`): devuelve el rol del usuario actual en ese hogar, usada en las policies de escritura. Las policies `ALL` únicas de `accounts/categories/budgets/transactions/cards` (una por tabla, sin distinguir rol) se reemplazaron por 4 policies cada una: SELECT abierta a cualquier miembro, INSERT/UPDATE/DELETE que exigen `user_household_role(household_id) != 'viewer'`.
+
+Cambiar el rol de otro miembro es un `UPDATE` declarativo sobre `household_members` (no una función): la policy exige que el que actúa sea `owner`/`admin`, que **no sea su propia fila** (nadie se auto-asciende) y que un `admin` no pueda ascender a otro a `admin` (sólo el `owner` puede asignar `admin`). Ninguna policy permite poner `role='owner'` — eso solo pasa vía `transfer_household_ownership`.
+
+### Invitaciones (`household_invitations`)
+
+Columnas: `email`, `role` (`admin|member|viewer`, nunca `owner`), `invited_by`, `message`, `token` (uuid único, es el link), `status` (`pending|accepted|cancelled|expired`), `expires_at` (7 días). RLS: solo `owner`/`admin` del hogar pueden ver/crear/cancelar/reenviar sus propias invitaciones — **no hay policy que exponga una invitación por token a alguien que no sea todavía miembro** (evita filtrar datos del hogar antes de aceptar); la pantalla de aceptación usa en cambio `get_invitation_preview(token)` (`SECURITY DEFINER`, `stable`, otorgado también a `anon`), que devuelve solo lo mínimo (nombre del hogar, rol, quién invitó, mensaje, estado) sin tocar ninguna tabla financiera.
+
+**Funciones `SECURITY DEFINER` nuevas** (mismo patrón de siempre para resolver problemas de "huevo y gallina" de RLS):
+- `create_household_invitation(household_id, email, role, message)`: valida que quien invita sea `owner`/`admin`, que el email no sea ya miembro del hogar, y que no haya ya una invitación pendiente sin vencer para ese email+hogar.
+- `accept_household_invitation(token)`: valida invitación existe/no usada/no cancelada/no vencida, que el email coincide con el usuario logueado, y que **el usuario no pertenece ya a otro hogar** (el modelo sigue siendo 1 hogar por usuario, ver "Limitaciones" abajo) — recién ahí inserta en `household_members` con el rol de la invitación y marca la invitación `accepted`.
+- `remove_household_member(member_id)`: `owner` puede remover a cualquiera menos a sí mismo; `admin` solo a `member`/`viewer` (no a otro `admin` ni al `owner`); nadie se remueve a sí mismo por acá (ver `leave_household`).
+- `leave_household(household_id)`: el `owner` no puede usarla sin transferir la propiedad antes (previene un hogar sin dueño).
+- `transfer_household_ownership(household_id, new_owner_user_id)`: mueve `role='owner'` al nuevo dueño y baja al dueño anterior a `admin`, en una sola transacción (evita el estado transitorio de "2 dueños" o "0 dueños" de hacerlo con 2 updates separados desde el cliente).
+- `delete_household(household_id)`: solo `owner`; borra el hogar completo (todas las FKs a `households` son `on delete cascade`, incluida `household_members`, así que se lleva puesto todo el household de un tirón).
+
+### Envío del email de invitación
+
+`app/api/invitations/send/route.ts` (server-side, usa `lib/supabase/admin.ts` con la service role key): primero confirma autorización re-consultando `household_invitations` con el cliente de sesión del que invita (la policy de SELECT, solo owner/admin, hace de control de acceso — no hace falta reimplementarlo a mano). Después:
+- **Email nuevo (sin cuenta Borb):** `admin.auth.admin.inviteUserByEmail(email, {redirectTo})` — usa el email nativo de "invitación" de Supabase Auth, sin infraestructura nueva. `redirectTo` apunta a `/auth/callback?next=/invite/{token}`, así que al confirmar el link quedan logueados y redirigidos directo a la pantalla de aceptación.
+- **Email que ya es usuario Borb:** `inviteUserByEmail` rechaza (ya existe la cuenta) — no hay proveedor de email transaccional propio en este proyecto, así que en este caso se devuelve el link (`/invite/{token}`) para que quien invita lo comparta manualmente (WhatsApp, etc.). **Límite conocido, documentado a propósito**, no un bug: agregar un proveedor de email transaccional (Resend, Postmark, etc.) es una fase futura si hace falta automatizar esto.
+
+### Emails de miembros del hogar (`get_household_member_emails`)
+
+`auth.users` no se expone vía PostgREST (ni siquiera con la service role key desde el cliente), así que mostrar el email de cada miembro en `/household` no puede hacerse con un `select` normal. En vez de una API route con la service role key, una función `SECURITY DEFINER` (`get_household_member_emails(household_id)`) lee `auth.users` directamente en SQL (dentro de Postgres no hay restricción de schema como en PostgREST) y devuelve `(user_id, email)` para los miembros de un hogar al que el que llama pertenece.
+
+### FK extra para permitir el embed de `profiles` desde `household_members`
+
+PostgREST necesita una FK **directa** entre 2 tablas para poder hacer `select "*, profiles(...)" from household_members`. Ambas columnas (`household_members.user_id` y `profiles.id`) apuntan a `auth.users`, pero eso no alcanza — PostgREST no ve el schema `auth`, así que no infiere la relación indirecta. Se agregó una segunda FK `household_members_user_id_profiles_fkey` (mismo valor, otro destino) solo para que el embed funcione; no cambia ninguna regla de negocio (el valor siempre es el mismo, ya que `profiles.id` y `auth.users.id` están sincronizados por el trigger `handle_new_user`).
+
+### Limpieza de cache al cerrar sesión / cambios de rol
+
+`SignOutButton` ahora llama `queryClient.clear()` **y** borra la clave de IndexedDB (`REACT_QUERY_OFFLINE_CACHE`) además de `supabase.auth.signOut()` — mismo espíritu que el bug de cache cruzada de Fase 1 (ver "Reglas obligatorias" más abajo), pero esta vez aplicado también al momento de salir, no solo a las queryKeys. Las mutaciones de rol/remoción/transferencia/aceptación invalidan `["household-members"]`/`["current-household"]` o hacen `queryClient.clear()` completo (aceptar invitación, salir del hogar, eliminar hogar) ya que esas acciones cambian de qué hogar es "el mío".
+
+### Limitaciones conocidas del MVP (documentadas a propósito, no son bugs)
+
+- **1 hogar por usuario, sin excepción.** Si alguien invitado ya pertenece a otro hogar, `accept_household_invitation` lo bloquea con un mensaje claro. Un selector de "cambiar de hogar" para pertenecer a varios a la vez es un cambio grande (toda la app asume "el" hogar del usuario) — queda para una fase posterior si hace falta.
+- **Sin expulsión en tiempo real.** RLS se evalúa en vivo en cada request, así que un miembro removido pierde acceso en su **próxima** consulta — pero si tenía la app abierta en ese momento, la UI no se actualiza sola hasta el próximo refetch/refresh (no hay Supabase Realtime conectado a `household_members` todavía).
+- **Sin gestión de sesiones activas.** Supabase no expone listar/cerrar sesiones de otros dispositivos vía el SDK de cliente — Settings > Seguridad solo muestra el método de login actual (Google o email) y permite cerrar la sesión propia.
+- **Notificaciones sin motor de envío.** `notification_preferences` guarda la preferencia del usuario (toggles en Settings), pero no hay ningún proveedor de push/email transaccional conectado todavía — es modelo de datos preparado, no una feature activa.
+- **Apariencia e integraciones son placeholders.** La app sigue siendo 100% el sistema "Aura Finance" oscuro (sin modo claro) y no hay ninguna integración externa (bancos, Gmail, IA) implementada — ambas secciones de Settings solo dicen "Próximamente".
+
 ## Esquema de base de datos — Fase 1
 
 ```sql
@@ -120,15 +181,60 @@ households (
   secondary_currency text null, -- agregado en onboarding refinado: moneda secundaria opcional
   onboarding_step text default 'household', -- agregado en onboarding refinado, ver "Onboarding refinado"
     -- check: 'household' | 'accounts' | 'cards' | 'budget' | 'review' | 'done'
+  avatar_url text null, -- agregado en gestión de usuarios/hogar
+  financial_month_start_day int default 1, -- 1-28, agregado en gestión de usuarios/hogar
+  default_budget_period text default 'monthly', -- 'monthly' | 'biweekly'
   created_at timestamptz
 )
 
 household_members (
   id uuid pk,
   household_id uuid fk -> households,
-  user_id uuid fk -> auth.users,
-  role text, -- 'owner' | 'member'
+  user_id uuid fk -> auth.users AND fk -> profiles, -- 2 FKs sobre la misma columna: la 2da (a profiles) es solo para que PostgREST pueda embeder profiles (ver "Usuarios, roles e invitaciones")
+  role text, -- 'owner' | 'admin' | 'member' | 'viewer' (admin/viewer agregados en gestión de usuarios/hogar)
   joined_at timestamptz
+)
+
+profiles (
+  -- 1:1 con auth.users, creada por el trigger handle_new_user
+  id uuid pk fk -> auth.users on delete cascade,
+  full_name text null,
+  avatar_url text null,
+  preferred_language text default 'es',
+  timezone text default 'America/Tegucigalpa',
+  date_format text default 'DD/MM/YYYY', -- check: 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+  number_format text default 'es-HN',
+  preferred_currency text null,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+
+household_invitations (
+  id uuid pk,
+  household_id uuid fk -> households,
+  email text,
+  role text, -- check: 'admin' | 'member' | 'viewer' (nunca 'owner')
+  invited_by uuid fk -> auth.users,
+  message text null,
+  token uuid unique, -- usado en el link de invitación
+  status text default 'pending', -- check: 'pending' | 'accepted' | 'cancelled' | 'expired'
+  expires_at timestamptz, -- default now() + 7 días
+  accepted_at timestamptz null,
+  accepted_by uuid fk -> auth.users null,
+  created_at timestamptz
+)
+
+notification_preferences (
+  -- sin motor de envío todavía, ver "Limitaciones conocidas"
+  user_id uuid pk fk -> auth.users on delete cascade,
+  payment_reminders boolean default true,
+  budget_alerts boolean default true,
+  unusual_transaction_alerts boolean default true,
+  savings_milestones boolean default true,
+  cashback_opportunities boolean default false,
+  weekly_summary boolean default false,
+  monthly_summary boolean default true,
+  updated_at timestamptz
 )
 
 accounts (
@@ -302,10 +408,13 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 `✅` = ya existe. Sin marcar = se crea cuando esa fase la necesite (no crear carpetas vacías por adelantado).
 
 ```
-/proxy.ts                     ✅ sesión/redirect (ver "Sesión / Auth")
+/proxy.ts                     ✅ sesión/redirect (ver "Sesión / Auth"; /invite es público)
 /app
-  /(auth)/login                ✅ email/password + botón Google
-  /auth/callback/route.ts      ✅ intercambia code OAuth por sesión
+  /(auth)/login                ✅ email/password + botón Google (soporta ?next=)
+  /auth/callback/route.ts      ✅ intercambia code OAuth por sesión (soporta ?next=)
+  /invite/[token]              ✅ aceptar invitación (público, fuera de (dashboard))
+  /api/invitations/send        ✅ envía/genera el link de invitación (service role)
+  /api/account/delete          ✅ elimina la cuenta del usuario (service role)
   /(dashboard)/layout.tsx      ✅ (guard de auth + header + nav + OnboardingGuard)
   /(dashboard)/dashboard       ✅ Fase 1
   /(dashboard)/accounts        ✅ Fase 1 (CRUD + edición inline)
@@ -313,15 +422,25 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
   /(dashboard)/transactions/import ✅ Fase 1-B, importación CSV
   /(dashboard)/budgets         ✅ Fase 1
   /(dashboard)/categories      ✅ Fase 1 (CRUD + edición inline)
+  /(dashboard)/profile         ✅ perfil personal, email, eliminar cuenta
+  /(dashboard)/household       ✅ miembros, invitar, roles, configuración del hogar
+  /(dashboard)/settings        ✅ hub de configuración (ver "Usuarios, roles e invitaciones")
 /components
-  sign-out-button.tsx          ✅
-  nav-links.tsx                ✅
+  sign-out-button.tsx          ✅ (limpia queryClient + IndexedDB)
+  account-menu.tsx              ✅ menú de usuario (Perfil/Hogar/Configuración/Salir)
+  sidebar.tsx                   ✅ nav principal desktop (refresh de UI, reemplaza nav-links.tsx)
+  topbar.tsx                    ✅ buscador + notificaciones + AccountMenu (refresh de UI)
+  mobile-nav.tsx                ✅ fallback mínimo de navegación en mobile (refresh de UI)
+  global-search.tsx             ✅ buscador real sobre cuentas/categorías cacheadas (refresh de UI)
   onboarding-guard.tsx         ✅ wizard de 5 pasos para usuarios nuevos (ver "Onboarding refinado")
   /onboarding                  ✅ household/accounts/cards/budget/review-step.tsx + step-shell.tsx
-  /ui                          ✅ Fase 1 (Button, Input, Select, Card)
+  /household                   ✅ members-list/invite-form/pending-invitations/household-settings-form/ownership-actions
+  /settings/notification-toggles.tsx ✅
+  /ui                          ✅ Button, Input, Select, Card, Icon (refresh de UI en icon.tsx)
 /lib
-  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES
-  /supabase                    ✅ client.ts / server.ts / middleware.ts
+  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES, roles, idiomas, formatos
+  csv-export.ts                 ✅ exportar transacciones a CSV
+  /supabase                    ✅ client.ts / server.ts / middleware.ts / admin.ts (service role, solo server)
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
   /hooks                       ✅ Fase 1, React Query hooks (uno por recurso + use-auth-user-id.ts)
   csv.ts                        ✅ Fase 1-B, parseo de CSV (papaparse)
@@ -330,6 +449,26 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
 /supabase
   /migrations                  ✅ una migración SQL por cambio de schema/RLS
 ```
+
+## Sistema de diseño (refresh de UI, desktop)
+
+Pedido explícito del usuario: "refrescar el UI de la app, en desktop inicialmente", a partir de un proyecto nuevo de Stitch ("Borb Financial OS", ID `10149068696168867474`) con 7 pantallas desktop. Reemplaza la paleta grisácea original "Aura Finance" de Fase 0.
+
+**De dónde sale cada cosa:**
+- **Tokens de color/tipografía** (`app/globals.css`): de la config de Tailwind embebida en el HTML de "Wealth Dashboard" — primary violeta (`#d2bbff`/`#7c3aed`), secondary menta (`#4edea3`/`#00a572`), tertiary naranja (`#ffb784`), fondo azul muy oscuro (`#0b1326`). Misma convención de nombres Material Design 3 que ya usaba el sistema anterior (`primary`/`on-primary`/`surface-container-*`), así que fue un reemplazo de valores, no de arquitectura de tokens.
+- **Tipografía**: Inter/JetBrains Mono → **Outfit** (única fuente para todo, incluido lo que antes era `font-mono` — se re-apuntó la variable CSS `--font-mono` a Outfit en vez de cambiar cada uso de `font-mono` archivo por archivo, ver `app/globals.css`).
+- **Íconos**: Material Symbols Outlined (variable font, cargada en `app/layout.tsx` vía `<link>` en el `<head>` — `next/font` no cubre esta fuente). Componente `components/ui/icon.tsx` (`<Icon name="..." filled? size? />`) para uso consistente.
+- **Utilidades nuevas** (`app/globals.css`): `.glass-panel` (fondo + borde sutil de las tarjetas), `.glow-active` (sombra difusa violeta en elementos activos/CTA), `.chart-gradient`, scrollbar delgado.
+- **Layout**: sidebar fijo izquierdo (`components/sidebar.tsx`, reemplaza el header con nav horizontal) + topbar (`components/topbar.tsx`: buscador + notificaciones + `AccountMenu`). El sidebar es `hidden md:flex` (desktop-first, como pidió el usuario) — `components/mobile-nav.tsx` es el mínimo indispensable para que mobile no se quede sin forma de navegar mientras no se hace la pasada responsive completa.
+- **Buscador global** (`components/global-search.tsx`): filtra cuentas/categorías ya cacheadas por nombre y navega a su lista — deliberadamente **no** es una búsqueda con IA (eso es "Command Center", ver abajo).
+
+**Qué NO se implementó como página, a propósito (decisión confirmada con el usuario):** de las 7 pantallas de Stitch, 4 representan funcionalidad que no existe y no es Fase 1:
+- **Command Center** (asistente en lenguaje natural) y **Financial Brief** (insights generados por IA) — Fase 4/5 según `roadmap.md`/`project_state.md`.
+- **Connect Accounts** y **Activation** (búsqueda de institución bancaria + animación de "análisis" tipo Plaid) — el onboarding sigue siendo 100% carga manual, por decisión explícita del usuario (ver "Decisiones clave" en `project_state.md`).
+
+De esas 4 se tomó **solo el lenguaje visual** (colores, tipografía, glass-panel/glow) para refrescar las pantallas reales (Dashboard, onboarding) — no se creó ninguna página nueva ni funcionalidad simulada a partir de ellas. Si esas fases arrancan en el futuro, ese mismo proyecto de Stitch sigue siendo la referencia de diseño a usar.
+
+**Alcance de esta pasada:** desktop (≥768px). El sidebar/topbar tienen un fallback mínimo para mobile (`MobileNav`, menú hamburguesa con los mismos links) para no dejarlo roto, pero no hubo una pasada de diseño responsive dedicada — queda pendiente si se prioriza.
 
 ## No-funcionales
 

@@ -1,42 +1,48 @@
 @import "tailwindcss";
 
 /*
-  Paleta y tipografía tomadas de docs/design/design-system.md
-  (sistema "Aura Finance" generado en Stitch — calm intelligence / glassmorphism, dark-only).
+  Paleta y tipografía del refresh de UI (proyecto Stitch "Borb Financial OS",
+  ID 10149068696168867474 — pantallas Wealth Dashboard/Set Budgets/Welcome/
+  Connect Accounts). Reemplaza la paleta grisácea original "Aura Finance" de
+  Fase 0 por una más vívida (violeta/menta/naranja) sobre el mismo fondo azul
+  muy oscuro. Solo se tomó el lenguaje visual de las 7 pantallas de ese
+  proyecto — Command Center, Financial Brief, Connect Accounts y Activation
+  no se implementaron como páginas (son Fase 4/5 / requieren integración
+  bancaria real, ver project_state.md).
 */
 :root {
-  --background: #081425;
-  --on-background: #d8e3fb;
+  --background: #0b1326;
+  --on-background: #dae2fd;
 
-  --surface: #081425;
-  --surface-dim: #081425;
-  --surface-bright: #2f3a4c;
-  --surface-container-lowest: #040e1f;
-  --surface-container-low: #111c2d;
-  --surface-container: #152031;
-  --surface-container-high: #1f2a3c;
-  --surface-container-highest: #2a3548;
-  --on-surface: #d8e3fb;
-  --on-surface-variant: #c6c6ca;
-  --surface-variant: #2a3548;
+  --surface: #0b1326;
+  --surface-dim: #0b1326;
+  --surface-bright: #31394d;
+  --surface-container-lowest: #060e20;
+  --surface-container-low: #131b2e;
+  --surface-container: #171f33;
+  --surface-container-high: #222a3d;
+  --surface-container-highest: #2d3449;
+  --on-surface: #dae2fd;
+  --on-surface-variant: #ccc3d8;
+  --surface-variant: #2d3449;
 
-  --outline: #8f9094;
-  --outline-variant: #45474a;
+  --outline: #958da1;
+  --outline-variant: #4a4455;
 
-  --primary: #c6c6ca;
-  --on-primary: #2f3034;
-  --primary-container: #121417;
-  --on-primary-container: #7d7e82;
+  --primary: #d2bbff;
+  --on-primary: #3f008e;
+  --primary-container: #7c3aed;
+  --on-primary-container: #ede0ff;
 
-  --secondary: #44e2cd;
-  --on-secondary: #003731;
-  --secondary-container: #03c6b2;
-  --on-secondary-container: #004d44;
+  --secondary: #4edea3;
+  --on-secondary: #003824;
+  --secondary-container: #00a572;
+  --on-secondary-container: #00311f;
 
-  --tertiary: #b9c8de;
-  --on-tertiary: #233143;
-  --tertiary-container: #051525;
-  --on-tertiary-container: #718094;
+  --tertiary: #ffb784;
+  --on-tertiary: #4f2500;
+  --tertiary-container: #a15100;
+  --on-tertiary-container: #ffe0cd;
 
   --error: #ffb4ab;
   --on-error: #690005;
@@ -83,16 +89,71 @@
   --color-error-container: var(--error-container);
   --color-on-error-container: var(--on-error-container);
 
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-jetbrains-mono);
+  /* Outfit reemplaza a Inter/JetBrains Mono en todo el sistema — el nuevo
+     lenguaje visual no distingue una tipografía de datos separada, así que
+     apuntar font-mono acá también a Outfit refresca los montos ($ en
+     font-mono en decenas de pantallas existentes) sin tener que tocar cada
+     archivo uno por uno. */
+  --font-sans: var(--font-outfit);
+  --font-mono: var(--font-outfit);
 
   --radius-sm: 0.5rem;
   --radius-md: 1.5rem;
   --radius-lg: 2rem;
   --radius-xl: 3rem;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 12px;
+  --spacing-gutter: 24px;
+  --spacing-lg: 40px;
+  --spacing-xl: 64px;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-on-background);
+}
+
+/* Utilidades del refresh de UI — mismas clases que usan las pantallas de
+   Stitch, así el HTML de referencia se traduce directo sin reinventar
+   nombres. */
+.glass-panel {
+  background-color: var(--color-surface-container);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glow-active {
+  box-shadow: 0 0 12px 0 rgba(210, 187, 255, 0.2);
+}
+
+.chart-gradient {
+  background: linear-gradient(180deg, rgba(210, 187, 255, 0.15) 0%, rgba(210, 187, 255, 0) 100%);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-container-highest);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-outline-variant);
+}
+
+/* Material Symbols Outlined — variable font cargada en app/layout.tsx.
+   Sin esto el span.material-symbols-outlined muestra el nombre del ícono
+   como texto en vez del glifo. */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
 }

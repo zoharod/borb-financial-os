@@ -1,11 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input, Label } from "@/components/ui/input";
+import { Icon } from "@/components/ui/icon";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +44,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(next);
     router.refresh();
   }
 
@@ -42,7 +55,9 @@ export default function LoginPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+      },
     });
 
     if (error) {
@@ -56,35 +71,38 @@ export default function LoginPage() {
     <main className="flex flex-1 items-center justify-center px-5">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm rounded-lg bg-surface-container p-8 border border-outline-variant/20"
+        className="w-full max-w-sm glass-panel rounded-lg p-8"
       >
-        <h1 className="text-2xl font-semibold text-on-surface mb-1">
-          Borb Financial OS
-        </h1>
-        <p className="text-sm text-on-surface-variant mb-6">
-          Ingresá con tu cuenta del hogar.
-        </p>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-primary-container flex items-center justify-center glow-active flex-shrink-0">
+            <Icon name="dataset" className="text-on-primary-container" filled />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-primary tracking-tight leading-tight">
+              Borb Financial OS
+            </h1>
+            <p className="text-xs text-on-surface-variant">
+              Ingresá con tu cuenta del hogar
+            </p>
+          </div>
+        </div>
 
-        <label className="block text-sm text-on-surface-variant mb-1">
-          Email
-        </label>
-        <input
+        <Label>Email</Label>
+        <Input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-4 rounded-sm bg-surface-container-lowest px-3 py-2 text-on-surface shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-secondary/30"
+          className="mb-4"
         />
 
-        <label className="block text-sm text-on-surface-variant mb-1">
-          Contraseña
-        </label>
-        <input
+        <Label>Contraseña</Label>
+        <Input
           type="password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-4 rounded-sm bg-surface-container-lowest px-3 py-2 text-on-surface shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] outline-none focus:ring-2 focus:ring-secondary/30"
+          className="mb-4"
         />
 
         {error && (
@@ -93,13 +111,9 @@ export default function LoginPage() {
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-full bg-secondary text-on-secondary-container font-medium py-2 disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? "Ingresando..." : "Ingresar"}
-        </button>
+        </Button>
 
         <div className="flex items-center gap-3 my-4">
           <div className="h-px flex-1 bg-outline-variant/20" />
@@ -107,14 +121,15 @@ export default function LoginPage() {
           <div className="h-px flex-1 bg-outline-variant/20" />
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={handleGoogleSignIn}
           disabled={googleLoading}
-          className="w-full rounded-full border border-outline-variant text-on-surface font-medium py-2 disabled:opacity-50"
+          className="w-full"
         >
           {googleLoading ? "Redirigiendo..." : "Continuar con Google"}
-        </button>
+        </Button>
       </form>
     </main>
   );
