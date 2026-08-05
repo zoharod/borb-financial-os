@@ -101,12 +101,6 @@
   --radius-md: 1.5rem;
   --radius-lg: 2rem;
   --radius-xl: 3rem;
-
-  --spacing-xs: 4px;
-  --spacing-sm: 12px;
-  --spacing-gutter: 24px;
-  --spacing-lg: 40px;
-  --spacing-xl: 64px;
 }
 
 body {
