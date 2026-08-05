@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
-import type { TablesInsert } from "@/types/supabase";
+import type { TablesInsert, TablesUpdate } from "@/types/supabase";
 
 export type BudgetWithCategory = {
   id: string;
@@ -88,6 +88,23 @@ export function useCreateBudget() {
     mutationFn: async (budget: TablesInsert<"budgets">) => {
       const supabase = createClient();
       const { error } = await supabase.from("budgets").insert(budget);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["budgets"] });
+    },
+  });
+}
+
+export function useUpdateBudget() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...updates
+    }: TablesUpdate<"budgets"> & { id: string }) => {
+      const supabase = createClient();
+      const { error } = await supabase.from("budgets").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

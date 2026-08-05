@@ -24,13 +24,15 @@ Esto ya funciona hoy: una compra con tarjeta se puede cargar como `type='expense
 Una **tarjeta** es distinta de una **cuenta `credit_card`**: la cuenta es el libro contable (cuánto debés, ya funciona desde Fase 1-C); la tarjeta es la identidad física/virtual con sus reglas propias (límite, cashback, ciclo de facturación). La tabla `cards` se creó antes de lo previsto en este documento, como parte del onboarding refinado (no de Fase 2) — la relación terminó siendo **1:N, no 1:1** como se había propuesto acá originalmente:
 
 ```sql
--- YA IMPLEMENTADO (migración 20260804110528)
+-- YA IMPLEMENTADO (migración 20260804110528, cardholder_user_id agregado
+-- después en 20260804163200 — ver "Tarjetahabiente" abajo)
 cards (
   id uuid pk,
   household_id uuid fk,
   name text, -- "Visa Signature BAC"
   bank text null,
-  cardholder text null,
+  cardholder_user_id uuid fk -> auth.users null,
+  legacy_cardholder_name text null, -- ver "Tarjetahabiente"
   network text null, -- check: 'visa' | 'mastercard' | 'amex' | 'other'
   last4 text null,
   credit_limit numeric null,
@@ -43,6 +45,12 @@ cards (
 
 -- accounts gana card_id (nullable, on delete set null) en vez de cards.account_id
 ```
+
+### Tarjetahabiente — selector de miembro, no texto libre
+
+`cards.cardholder` empezó como texto libre; pedido explícito del usuario para que sea un `household_member` real (poder saber a quién pertenece cada tarjeta, y eventualmente filtrar gastos/reportes por persona). Se migró a `cardholder_user_id` (FK a `auth.users`, igual patrón que `expected_income.household_member_user_id`), seleccionado en el onboarding desde `useHouseholdMembers()` (nombre + avatar/iniciales). Si el hogar tiene un solo miembro (caso normal al onboardear), la UI muestra un link contextual a "Invitá a alguien" en vez de bloquear el flujo — asignar el tarjetahabiente después de invitar es un caso de uso válido, no un error.
+
+**Backfill de datos reales:** al migrar, `cardholder` ya tenía texto de producción (nombres de pila). Se intentó un match por prefijo (`profiles.full_name ILIKE cardholder || '%'`) contra los miembros del mismo household — lo que no matcheó (la persona todavía no se había unido al hogar) se conservó en `legacy_cardholder_name` en vez de perderse, mostrado en la UI como "(sin vincular)" hasta que alguien lo reemplace manualmente por un `cardholder_user_id` real.
 
 **Por qué 1:N (hasta 2 cuentas por tarjeta) y no 1:1:** una tarjeta puede tener saldo/deuda en más de una moneda (ej. una tarjeta BAC con consumos en HNL y en USD) — modelarla como `accounts.card_id -> cards.id` (en vez de `cards.account_id -> accounts.id` único) permite que el wizard de onboarding cree **una fila de `accounts` (`type='credit_card'`) por cada moneda en la que el usuario cargó saldo**, todas apuntando a la misma tarjeta, sin forzar a combinar HNL y USD en un solo número ni a elegir una tarjeta "por moneda" artificialmente. El saldo de cada cuenta-tarjeta sigue siendo el mismo mecanismo de siempre (derivado de `transactions`, negativo = deuda) — `cards` solo agrega la metadata que no varía por moneda (nombre, banco, ciclo de facturación, límite, pagos).
 
@@ -64,11 +72,60 @@ Por qué separar `cards` de `accounts` en vez de meterle más columnas a `accoun
 
 ## Subida de estado de cuenta (extracción) — preparado en el schema, no implementado
 
-El paso de onboarding de tarjetas incluye un input de archivo ("Subir tu último estado de cuenta") que hoy solo muestra un mensaje de "próximamente" — no parsea nada ni guarda el archivo. Cuando se implemente (fase de importación de estados de cuenta, todavía sin numerar en el roadmap):
+El paso de onboarding de tarjetas incluye un input de archivo ("Subir tu último estado de cuenta") con estado real (`File` en memoria, Reemplazar/Quitar, aviso de "extracción no disponible") pero **todavía no parsea ni guarda el archivo en ningún lado** — es solo un apoyo visual mientras el usuario completa los campos a mano. El archivo se limpia automáticamente después de crear la tarjeta (nunca se arrastra a la tarjeta siguiente) y al tocar "Quitar" (nunca se guarda silenciosamente después de que el usuario lo saca — regla de producto explícita). Cuando se implemente la extracción real (fase de importación de estados de cuenta, todavía sin numerar en el roadmap):
 
 - Todos los campos que un parser necesitaría llenar (banco, últimos 4, tarjetahabiente, período/día de corte, día de pago, saldo por moneda, pago mínimo, pago de contado, límite) **ya existen** en `cards`/`accounts` — no debería hacer falta otra migración de schema para el caso básico.
 - **Regla de producto ya decidida (no reabrir sin razón nueva):** los datos extraídos se muestran siempre para revisión del usuario antes de guardar — nunca un guardado silencioso. El usuario debe poder Confirmar, Corregir, Completar campos faltantes, o Descartar (Skip) la extracción.
 - Transacciones recientes extraídas del estado de cuenta (si el parser las soporta) seguirían insertándose como `transactions` normales — no necesitan una tabla nueva, mismo mecanismo que la importación CSV de Fase 1-B.
+
+## Compromisos financieros (`financial_commitments`) — implementado
+
+Un **compromiso financiero** es una obligación recurrente ya asumida (cuota de financiamiento, minicuota, préstamo, pago de colegiatura en cuotas) que **no es lo mismo que un gasto de categoría**: representa dinero que el usuario ya sabe que va a pagar, no una decisión de presupuesto mes a mes. Modelarlo aparte de `budgets`/`categories` evita dos problemas: (1) mezclarlo con presupuesto discrecional haría parecer "gasto planeado" algo que en realidad es una deuda fija, y (2) permite trackear cuotas restantes/fecha de fin, que una categoría de presupuesto no tiene forma de representar.
+
+```sql
+financial_commitments (
+  id uuid pk,
+  household_id uuid fk,
+  name text,
+  amount numeric, -- monto de LA CUOTA, no el total financiado
+  currency text,
+  start_date date,
+  end_date date null,
+  remaining_installments int null,
+  frequency text, -- 'weekly' | 'biweekly' | 'monthly' | 'one_time'
+  next_payment_date date null,
+  account_id uuid fk -> accounts null, -- cuenta/tarjeta desde la que se paga
+  category_id uuid fk -> categories null, -- opcional, para reportes
+  status text default 'active', -- 'active' | 'completed'
+  created_at timestamptz
+)
+```
+
+**Cómo se paga sin duplicar la compra original:** cuando llega la fecha de pago, se registra una transacción `type='financing_installment'` con `commitment_id` apuntando a este compromiso. Esa transacción resta el saldo de la cuenta pagadora (plata real que sale) pero **no** cuenta como `expense` en el dashboard ni en presupuesto vs. real — si contara, la compra financiada se duplicaría (una vez al comprarla, otra vez en cada cuota). Ver architecture.md → "Dashboard: posición financiera".
+
+**No implementado (fuera de alcance de este pase):** avance automático de `next_payment_date`/`remaining_installments` al registrar un pago — hoy es manual (el usuario edita el compromiso). Marcar `status='completed'` también es manual.
+
+## Ingreso esperado (`expected_income`) — implementado
+
+Plata que el usuario **sabe** que va a entrar pero todavía no entró (salario, freelance, reembolso, bono, alquiler). Existe para alimentar la proyección de flujo de caja del dashboard sin contaminar el saldo real — la regla de producto explícita es **nunca contarlo como recibido hasta que se confirme o se convierta en una transacción real**.
+
+```sql
+expected_income (
+  id uuid pk,
+  household_id uuid fk,
+  source text, -- "Salario", "Freelance", ...
+  amount numeric,
+  currency text,
+  expected_date date,
+  frequency text, -- 'weekly' | 'biweekly' | 'monthly' | 'one_time'
+  household_member_user_id uuid fk -> auth.users null,
+  destination_account_id uuid fk -> accounts null,
+  status text default 'estimated', -- 'estimated' | 'confirmed'
+  created_at timestamptz
+)
+```
+
+`status` es informativo (confirmado vs. estimado) — **ninguno de los dos estados afecta el saldo real de ninguna cuenta**; ambos entran en `expectedIncomeThisMonth` de la proyección del dashboard por igual. Cuando la plata efectivamente entra, el flujo correcto es que el usuario registre una transacción `type='income'` normal (no hay conversión automática `expected_income` → `transactions` todavía — es una mejora futura, no un bug: evita el riesgo de contar dos veces si el usuario también carga el ingreso a mano).
 
 ## Compras con tarjeta — Fase 2, no implementado
 

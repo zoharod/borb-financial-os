@@ -86,7 +86,7 @@ export function AccountsStep({
   return (
     <StepShell
       step={2}
-      total={5}
+      total={7}
       title="Agregá tus cuentas"
       description="Efectivo, cuentas corrientes, ahorro o inversión. Agregá todas las que uses — vas a poder seguir sumando o editando después."
       onBack={onBack}

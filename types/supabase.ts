@@ -107,13 +107,14 @@ export type Database = {
       cards: {
         Row: {
           bank: string | null
-          cardholder: string | null
+          cardholder_user_id: string | null
           created_at: string
           credit_limit: number | null
           full_payment_amount: number | null
           household_id: string
           id: string
           last4: string | null
+          legacy_cardholder_name: string | null
           minimum_payment: number | null
           name: string
           network: string | null
@@ -122,13 +123,14 @@ export type Database = {
         }
         Insert: {
           bank?: string | null
-          cardholder?: string | null
+          cardholder_user_id?: string | null
           created_at?: string
           credit_limit?: number | null
           full_payment_amount?: number | null
           household_id: string
           id?: string
           last4?: string | null
+          legacy_cardholder_name?: string | null
           minimum_payment?: number | null
           name: string
           network?: string | null
@@ -137,13 +139,14 @@ export type Database = {
         }
         Update: {
           bank?: string | null
-          cardholder?: string | null
+          cardholder_user_id?: string | null
           created_at?: string
           credit_limit?: number | null
           full_payment_amount?: number | null
           household_id?: string
           id?: string
           last4?: string | null
+          legacy_cardholder_name?: string | null
           minimum_payment?: number | null
           name?: string
           network?: string | null
@@ -185,6 +188,136 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "categories_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expected_income: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          destination_account_id: string | null
+          expected_date: string
+          frequency: string
+          household_id: string
+          household_member_user_id: string | null
+          id: string
+          source: string
+          status: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency: string
+          destination_account_id?: string | null
+          expected_date: string
+          frequency?: string
+          household_id: string
+          household_member_user_id?: string | null
+          id?: string
+          source: string
+          status?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          destination_account_id?: string | null
+          expected_date?: string
+          frequency?: string
+          household_id?: string
+          household_member_user_id?: string | null
+          id?: string
+          source?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expected_income_destination_account_id_fkey"
+            columns: ["destination_account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expected_income_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_commitments: {
+        Row: {
+          account_id: string | null
+          amount: number
+          category_id: string | null
+          created_at: string
+          currency: string
+          end_date: string | null
+          frequency: string
+          household_id: string
+          id: string
+          name: string
+          next_payment_date: string | null
+          remaining_installments: number | null
+          start_date: string
+          status: string
+        }
+        Insert: {
+          account_id?: string | null
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          currency: string
+          end_date?: string | null
+          frequency?: string
+          household_id: string
+          id?: string
+          name: string
+          next_payment_date?: string | null
+          remaining_installments?: number | null
+          start_date: string
+          status?: string
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          currency?: string
+          end_date?: string | null
+          frequency?: string
+          household_id?: string
+          id?: string
+          name?: string
+          next_payment_date?: string | null
+          remaining_installments?: number | null
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_commitments_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_commitments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_commitments_household_id_fkey"
             columns: ["household_id"]
             isOneToOne: false
             referencedRelation: "households"
@@ -401,6 +534,7 @@ export type Database = {
           amount: number
           card_id: string | null
           category_id: string | null
+          commitment_id: string | null
           created_at: string
           created_by: string
           currency: string
@@ -420,6 +554,7 @@ export type Database = {
           amount: number
           card_id?: string | null
           category_id?: string | null
+          commitment_id?: string | null
           created_at?: string
           created_by: string
           currency: string
@@ -439,6 +574,7 @@ export type Database = {
           amount?: number
           card_id?: string | null
           category_id?: string | null
+          commitment_id?: string | null
           created_at?: string
           created_by?: string
           currency?: string
@@ -466,6 +602,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_commitment_id_fkey"
+            columns: ["commitment_id"]
+            isOneToOne: false
+            referencedRelation: "financial_commitments"
             referencedColumns: ["id"]
           },
           {

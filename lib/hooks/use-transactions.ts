@@ -62,17 +62,26 @@ export function useCreateTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (
-      transaction: Omit<TablesInsert<"transactions">, "created_by">,
+      // created_by es opcional: por default es quien está logueado, pero el
+      // formulario permite registrar un gasto "a nombre de" otro miembro del
+      // hogar (ej. cargar un gasto que hizo tu pareja) — ver TransactionForm.
+      transaction: Omit<TablesInsert<"transactions">, "created_by"> & {
+        created_by?: string;
+      },
     ) => {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No hay sesión activa.");
+      let createdBy = transaction.created_by;
+      if (!createdBy) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("No hay sesión activa.");
+        createdBy = user.id;
+      }
 
       const { error } = await supabase
         .from("transactions")
-        .insert({ ...transaction, created_by: user.id });
+        .insert({ ...transaction, created_by: createdBy });
       if (error) throw error;
     },
     onSuccess: () => invalidateTransactionDerivedQueries(queryClient),

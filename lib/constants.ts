@@ -37,6 +37,7 @@ export const TRANSACTION_TYPES = [
   { value: "card_payment", label: "Pago de tarjeta" },
   { value: "refund", label: "Devolución" },
   { value: "adjustment", label: "Ajuste" },
+  { value: "financing_installment", label: "Cuota de financiamiento" },
 ] as const;
 
 // Tipos que mueven plata entre dos cuentas propias (requieren cuenta destino).

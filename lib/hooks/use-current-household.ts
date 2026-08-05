@@ -9,6 +9,8 @@ export type OnboardingStep =
   | "accounts"
   | "cards"
   | "budget"
+  | "commitments"
+  | "income"
   | "review"
   | "done";
 

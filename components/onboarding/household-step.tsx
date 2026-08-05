@@ -4,45 +4,84 @@ import { useState } from "react";
 import { StepShell } from "./step-shell";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label } from "@/components/ui/input";
-import { useCreateHousehold } from "@/lib/hooks/use-current-household";
+import {
+  useCreateHousehold,
+  useUpdateHouseholdSettings,
+} from "@/lib/hooks/use-current-household";
 import { CURRENCIES } from "@/lib/constants";
 
-export function HouseholdStep({ onCreated }: { onCreated: () => void }) {
-  const createHousehold = useCreateHousehold();
+type ExistingHousehold = {
+  householdId: string;
+  name: string;
+  primaryCurrency: (typeof CURRENCIES)[number];
+  secondaryCurrency: (typeof CURRENCIES)[number] | null;
+};
 
-  const [name, setName] = useState("");
-  const [primaryCurrency, setPrimaryCurrency] =
-    useState<(typeof CURRENCIES)[number]>("HNL");
+// Con `existing` se llega acá por el botón Atrás desde Cuentas (no por
+// primera vez) — el hogar ya existe, así que en vez de re-crearlo se edita.
+// Ningún dato de pasos posteriores se pierde: cuentas/tarjetas/presupuesto ya
+// están guardados en la base, no dependen de este componente.
+export function HouseholdStep({
+  onCreated,
+  existing,
+  onContinue,
+}: {
+  onCreated: () => void;
+  existing?: ExistingHousehold;
+  onContinue?: () => void;
+}) {
+  const createHousehold = useCreateHousehold();
+  const updateHousehold = useUpdateHouseholdSettings();
+
+  const [name, setName] = useState(existing?.name ?? "");
+  const [primaryCurrency, setPrimaryCurrency] = useState<
+    (typeof CURRENCIES)[number]
+  >(existing?.primaryCurrency ?? "HNL");
   const [secondaryCurrency, setSecondaryCurrency] = useState<
     (typeof CURRENCIES)[number] | ""
-  >("");
+  >(existing?.secondaryCurrency ?? "");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     try {
-      await createHousehold.mutateAsync({
-        name,
-        primaryCurrency,
-        secondaryCurrency: secondaryCurrency || null,
-      });
-      onCreated();
+      if (existing) {
+        await updateHousehold.mutateAsync({
+          householdId: existing.householdId,
+          name,
+          base_currency_default: primaryCurrency,
+          secondary_currency: secondaryCurrency || null,
+        });
+        onContinue?.();
+      } else {
+        await createHousehold.mutateAsync({
+          name,
+          primaryCurrency,
+          secondaryCurrency: secondaryCurrency || null,
+        });
+        onCreated();
+      }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Error al crear el household",
+        err instanceof Error ? err.message : "Error al guardar el hogar",
       );
     }
   }
 
+  const isSaving = existing ? updateHousehold.isPending : createHousehold.isPending;
   const otherCurrency = CURRENCIES.find((c) => c !== primaryCurrency)!;
 
   return (
     <StepShell
       step={1}
-      total={5}
-      title="Nombrá tu hogar"
-      description="Es la primera vez que entrás. Después vas a poder invitar a otra persona a compartirlo."
+      total={7}
+      title={existing ? "Datos de tu hogar" : "Nombrá tu hogar"}
+      description={
+        existing
+          ? "Podés ajustar el nombre o las monedas antes de seguir."
+          : "Es la primera vez que entrás. Después vas a poder invitar a otra persona a compartirlo."
+      }
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
@@ -96,8 +135,8 @@ export function HouseholdStep({ onCreated }: { onCreated: () => void }) {
           </p>
         )}
 
-        <Button type="submit" disabled={createHousehold.isPending}>
-          {createHousehold.isPending ? "Creando..." : "Continuar"}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? "Guardando..." : "Continuar"}
         </Button>
       </form>
     </StepShell>

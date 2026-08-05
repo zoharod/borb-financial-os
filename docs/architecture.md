@@ -87,18 +87,23 @@ $$;
 
 - **`use-current-household.ts` usa `.maybeSingle()`, no `.single()`** — con `.single()`, 0 filas es un error (`PGRST116`); un usuario recién logueado sin household todavía necesita que esto devuelva `null` limpiamente, no que explote.
 
-### Onboarding refinado (5 pasos) — reemplaza al wizard de 3 pasos de Fase 1
+### Onboarding refinado (7 pasos) — reemplaza al wizard de 3 pasos de Fase 1
 
-El wizard original (household → 1 cuenta → categorías) asumía una sola cuenta y no dejaba lugar para tarjetas de crédito ni saldos iniciales. Pedido explícito del usuario para que el onboarding soporte **múltiples cuentas, tarjetas como paso propio (no como "cuenta" genérica), carga de saldo inicial, y que el paso de categorías se entienda como "armar tu presupuesto mensual"** en vez de solo "elegí categorías". `components/onboarding-guard.tsx` ahora es un wizard de **5 pasos**, cada uno su propio componente en `components/onboarding/`:
+El wizard original (household → 1 cuenta → categorías) asumía una sola cuenta y no dejaba lugar para tarjetas de crédito ni saldos iniciales. Pedido explícito del usuario para que el onboarding soporte **múltiples cuentas, tarjetas como paso propio (no como "cuenta" genérica), carga de saldo inicial, y que el paso de categorías se entienda como "armar tu presupuesto mensual"** en vez de solo "elegí categorías". Una segunda ronda de feedback agregó compromisos financieros e ingreso esperado como pasos propios, presupuesto editable, navegación Atrás completa, y tarjetahabiente como selector de miembro real. `components/onboarding-guard.tsx` ahora es un wizard de **7 pasos**, cada uno su propio componente en `components/onboarding/`:
 
-1. **Household** (`household-step.tsx`) — nombre del hogar, moneda primaria, moneda secundaria opcional (HNL/USD, independientes, sin conversión — ver "Moneda"). Llama a `create_household_for_current_user` (ver abajo, ahora recibe las 2 monedas).
+1. **Household** (`household-step.tsx`) — nombre del hogar, moneda primaria, moneda secundaria opcional (HNL/USD, independientes, sin conversión — ver "Moneda"). Llama a `create_household_for_current_user` la primera vez; si se llega acá con "Atrás" desde Cuentas, el mismo componente pasa a **modo edición** (prop `existing`) y usa `useUpdateHouseholdSettings` en vez de crear un household nuevo — nunca duplica el hogar.
 2. **Cuentas** (`accounts-step.tsx`) — **repetible**: el usuario agrega cuentas una por una (nombre, tipo `checking`/`savings`, moneda, institución opcional, saldo actual opcional) con "Agregar cuenta" / "Continuar"; no asume 1 sola cuenta. Requiere ≥1 para avanzar. El saldo actual **no es una columna nueva** — sigue el principio de "transactions es la fuente de verdad": si el usuario carga un saldo, se crea la cuenta y después una transacción `type='adjustment'` por ese monto (mismo mecanismo que la conciliación de Fase 1-C), no un campo `balance` en `accounts`.
-3. **Tarjetas de crédito** (`cards-step.tsx`) — paso separado a propósito (no se crean como cuenta `checking`/`savings` genérica). **Repetible** y **opcional** (0 tarjetas es válido, "Continuar" nunca se bloquea). Cada tarjeta crea una fila en la nueva tabla `cards` (nombre, banco, tarjetahabiente, red, últimos 4, límite, día de corte, día de pago, pago mínimo, pago de contado — todos menos nombre/red son opcionales) y **hasta 2 filas en `accounts`** (`type='credit_card'`, `card_id` apuntando a la tarjeta), una por cada moneda en la que el usuario cargó saldo (HNL y/o USD) — así una tarjeta con deuda en ambas monedas no fuerza a combinarlas. El saldo de cada cuenta-tarjeta se siembra igual que en el paso 2, con una transacción `adjustment` **negativa** (saldo negativo = deuda, convención ya establecida en `domain.md`).
-   - **Subida de estado de cuenta:** input de archivo presente en la UI ("Subir tu último estado de cuenta"), pero **no hace extracción todavía** — muestra un mensaje de "función disponible próximamente" y no guarda nada. Es intencional para el MVP (ver más abajo); el modelo de datos de `cards` ya tiene todos los campos que un parser de PDF necesitaría llenar el día que se implemente, así que activarlo no va a requerir otra migración.
-4. **Presupuesto mensual** (`budget-step.tsx`) — reemplaza al viejo paso de "Categorías". Reencuadrado a propósito: no es "elegí categorías" sino "decidí cuánto vas a gastar este mes en cada una". Chips de categorías sugeridas (`BUDGET_CATEGORIES` en `lib/constants.ts`) + categoría personalizada por texto libre; click en una categoría abre un mini-form inline de monto+moneda que crea la categoría **y** su `budget` del mes actual juntos. Opcional (0 categorías es válido).
-5. **Revisión** (`review-step.tsx`) — resumen completo (hogar, cuentas con saldo, tarjetas con deuda por moneda, presupuesto con total por moneda), cada sección con botón "Editar" que vuelve a su paso (ver `editMode` abajo) sin perder lo ya guardado. Botón "Finalizar".
+3. **Tarjetas de crédito** (`cards-step.tsx`) — paso separado a propósito (no se crean como cuenta `checking`/`savings` genérica). **Repetible** y **opcional** (0 tarjetas es válido, "Continuar" nunca se bloquea). Cada tarjeta crea una fila en la tabla `cards` (nombre, banco, tarjetahabiente, red, últimos 4, límite, día de corte, día de pago, pago mínimo, pago de contado — todos menos nombre/red son opcionales) y **hasta 2 filas en `accounts`** (`type='credit_card'`, `card_id` apuntando a la tarjeta), una por cada moneda en la que el usuario cargó saldo (HNL y/o USD). El saldo de cada cuenta-tarjeta se siembra igual que en el paso 2, con una transacción `adjustment` **negativa** (saldo negativo = deuda, ver `domain.md`).
+   - **Tarjetahabiente** (`cards.cardholder_user_id`, FK a `auth.users`): selector de un `household_member` real, no texto libre — ver "Tarjetahabiente" en `domain.md`. Si el hogar tiene un solo miembro, se muestra un link contextual a `/household` para invitar a alguien.
+   - **Subida de estado de cuenta:** el archivo (`File`) se guarda en estado local del componente (no se sube a ningún lado — no hay extracción todavía), con acciones reales de Reemplazar/Quitar y un aviso de que la extracción automática no está disponible. Se limpia (`clearStatementFile()`) automáticamente después de crear la tarjeta, para que el archivo de una tarjeta nunca "se arrastre" a la siguiente que el usuario empiece a cargar — bug real del MVP anterior (solo existía un flag booleano, no el archivo en sí).
+4. **Presupuesto mensual** (`budget-step.tsx`) — chips de categorías sugeridas (`BUDGET_CATEGORIES`) + categoría personalizada, monto+moneda al agregar. **Editable**: cada fila tiene "Editar" (monto, moneda, y nombre si la categoría es personalizada — usa `useUpdateBudget`/`useUpdateCategory`) y "Quitar" (borra el `budget`, no la categoría en sí). Total por moneda visible debajo de la lista.
+5. **Compromisos financieros** (`commitments-step.tsx`, tabla `financial_commitments`) — cuotas, financiamientos, préstamos. Repetible y opcional. Ver "Compromisos financieros" en `domain.md`.
+6. **Ingreso esperado** (`income-step.tsx`, tabla `expected_income`) — salario, freelance, reembolsos, etc. Repetible y opcional. Ver "Ingreso esperado" en `domain.md`.
+7. **Revisión** (`review-step.tsx`) — resumen completo de las 6 secciones anteriores, cada una con botón "Editar" que vuelve a su paso (ver `editMode` abajo) sin perder lo ya guardado, más un botón "Atrás" directo al paso anterior (Ingreso esperado). Botón "Finalizar".
 
-**Por qué el progreso se persiste en una columna (`households.onboarding_step`) y no se infiere de los datos:** a diferencia del wizard de 3 pasos (donde "¿tiene ≥1 cuenta?" alcanzaba para saber en qué paso estaba), acá tarjetas y presupuesto son **opcionales** — un household con 0 tarjetas puede estar legítimamente "ya terminado" o "todavía no llegó a ese paso", y no hay forma de distinguirlo mirando solo si existen filas en `cards`/`budgets`. `onboarding_step` (check constraint: `household`|`accounts`|`cards`|`budget`|`review`|`done`) se actualiza en cada "Continuar" (nunca en "Atrás", que es navegación local nomás). El componente separa `OnboardingGuard` (decide loading / sin household / wizard) de un `OnboardingWizard` interno **keyed por `household.household_id`** con `useState(() => ...)` como inicializador perezoso del paso local — necesario para pasar el lint de este proyecto (`react-hooks/refs` prohíbe leer/escribir `ref.current` durante el render; un `useEffect` para sincronizar el paso inicial también fue rechazado por `react-hooks/set-state-in-effect`).
+**Navegación Atrás — nunca pierde datos.** Todo lo creado en cualquier paso (cuentas, tarjetas, presupuesto, compromisos, ingreso) ya está persistido en la base apenas se guarda — no vive en estado local del wizard — así que ir "Atrás" y "Adelante" de nuevo solo cambia qué formulario se muestra; las listas ya cargadas siguen ahí. `onboarding-guard.tsx` tiene una función `goBackFrom(step)` que resuelve el paso anterior vía `STEP_ORDER`, salvo en `editMode` (volver siempre a Revisión).
+
+**Por qué el progreso se persiste en una columna (`households.onboarding_step`) y no se infiere de los datos:** tarjetas, compromisos e ingreso son **opcionales** — un household con 0 tarjetas puede estar legítimamente "ya terminado" o "todavía no llegó a ese paso", y no hay forma de distinguirlo mirando solo si existen filas en esas tablas. `onboarding_step` (check constraint: `household`|`accounts`|`cards`|`budget`|`commitments`|`income`|`review`|`done`) se actualiza en cada "Continuar" (nunca en "Atrás", que es navegación local nomás). El componente separa `OnboardingGuard` (decide loading / sin household / wizard) de un `OnboardingWizard` interno **keyed por `household.household_id`** con `useState(() => ...)` como inicializador perezoso del paso local — necesario para pasar el lint de este proyecto (`react-hooks/refs` prohíbe leer/escribir `ref.current` durante el render; un `useEffect` para sincronizar el paso inicial también fue rechazado por `react-hooks/set-state-in-effect`).
 
 `editMode` (flag local, no persistido) maneja "Editar desde Revisión": entrar a un paso mediante "Editar" no debe hacer que su "Continuar" avance la secuencia normal, sino volver derecho a Revisión.
 
@@ -107,7 +112,7 @@ El wizard original (household → 1 cuenta → categorías) asumía una sola cue
 `lib/constants.ts` centraliza `CURRENCIES`, `ACCOUNT_TYPES`, `CARD_NETWORKS` y `BUDGET_CATEGORIES` porque el wizard reutiliza los mismos valores que `/accounts`, `/budgets` y (para tarjetas) una futura `/cards` — evita que las opciones queden inconsistentes si se agrega una moneda o un tipo nuevo.
 
 **MVP vs. diferido a la fase de importación de estados de cuenta:**
-- **En el MVP (ya implementado):** los 5 pasos completos, cuentas y tarjetas repetibles, saldo inicial vía `adjustment`, tarjetas con soporte de 2 monedas, presupuesto con monto+moneda por categoría, revisión editable, persistencia de progreso.
+- **En el MVP (ya implementado):** los 7 pasos completos, cuentas/tarjetas/compromisos/ingreso repetibles, saldo inicial vía `adjustment`, tarjetas con soporte de 2 monedas, presupuesto editable con monto+moneda por categoría, tarjetahabiente como selector de miembro real, navegación Atrás completa sin pérdida de datos, revisión editable, persistencia de progreso.
 - **Preparado en el schema pero sin UI de extracción todavía:** todos los campos de `cards` que un parser de estado de cuenta necesitaría (banco, últimos 4, tarjetahabiente, día de corte, día de pago, pago mínimo, pago de contado, límite) ya existen como columnas nullable — activar la extracción real (PDF/imagen → estos campos, mostrados siempre para revisión antes de guardar, nunca guardado silencioso) es una fase futura que **no requiere otra migración**, solo la lógica de parseo + una UI de confirmación/corrección.
 
 ## Usuarios, roles e invitaciones al hogar
@@ -256,7 +261,8 @@ cards (
   household_id uuid fk,
   name text,
   bank text null,
-  cardholder text null,
+  cardholder_user_id uuid fk -> auth.users null, -- antes texto libre ("cardholder"), ver domain.md
+  legacy_cardholder_name text null, -- texto pre-migración sin match a un household_member real
   network text null, -- check: 'visa' | 'mastercard' | 'amex' | 'other'
   last4 text null,
   credit_limit numeric null,
@@ -264,6 +270,41 @@ cards (
   payment_due_day int null, -- check 1-31
   minimum_payment numeric null,
   full_payment_amount numeric null,
+  created_at timestamptz
+)
+
+financial_commitments (
+  -- agregado en el onboarding refinado, punto 6 del pedido del usuario. Ver
+  -- domain.md "Compromisos financieros".
+  id uuid pk,
+  household_id uuid fk,
+  name text,
+  amount numeric, -- monto de la cuota, no el total financiado
+  currency text,
+  start_date date,
+  end_date date null,
+  remaining_installments int null,
+  frequency text, -- check: 'weekly' | 'biweekly' | 'monthly' | 'one_time'
+  next_payment_date date null,
+  account_id uuid fk -> accounts null, -- cuenta/tarjeta desde la que se paga
+  category_id uuid fk -> categories null,
+  status text default 'active', -- check: 'active' | 'completed'
+  created_at timestamptz
+)
+
+expected_income (
+  -- agregado en el onboarding refinado, punto 7 del pedido del usuario. Ver
+  -- domain.md "Ingreso esperado".
+  id uuid pk,
+  household_id uuid fk,
+  source text,
+  amount numeric,
+  currency text,
+  expected_date date,
+  frequency text, -- check: 'weekly' | 'biweekly' | 'monthly' | 'one_time'
+  household_member_user_id uuid fk -> auth.users null,
+  destination_account_id uuid fk -> accounts null,
+  status text default 'estimated', -- check: 'estimated' | 'confirmed'
   created_at timestamptz
 )
 
@@ -291,7 +332,8 @@ transactions (
   account_id uuid fk,
   to_account_id uuid fk null, -- agregado en Fase 1-C: cuenta destino de transfer/card_payment
   category_id uuid fk null,
-  type text, -- 'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment' (4 últimos agregados en Fase 1-C)
+  commitment_id uuid fk -> financial_commitments null, -- agregado en onboarding refinado: pago de una cuota
+  type text, -- 'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment' | 'financing_installment'
   amount numeric, -- siempre positivo, EXCEPTO 'adjustment' que puede ser negativo (ver "Transferencias y tipos de transacción")
   currency text,
   description text,
@@ -325,8 +367,8 @@ Decisión del usuario: cerrar "integridad financiera" antes de Fase 2, para que 
 
 ### Esquema
 
-- `transactions.to_account_id` (uuid, null): cuenta destino. Requerido solo para `type in ('transfer', 'card_payment')`; debe ser `null` para el resto.
-- `transactions.type` amplía su check constraint: `'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment'`.
+- `transactions.to_account_id` (uuid, null): cuenta destino. Requerido solo para `type in ('transfer', 'card_payment')`; debe ser `null` para el resto (incluido `financing_installment` — es un pago que sale del hogar, no una transferencia entre 2 cuentas propias).
+- `transactions.type` amplía su check constraint: `'income' | 'expense' | 'transfer' | 'card_payment' | 'refund' | 'adjustment' | 'financing_installment'` (el último, agregado en el onboarding refinado).
 - `accounts.type` amplía su check constraint: `'checking' | 'savings' | 'credit_card'`.
 - **Trigger de integridad** (`public.validate_transaction_accounts()`, `before insert or update on transactions`): valida en la base, no solo en la app —
   - `account_id` pertenece a `household_id`.
@@ -345,18 +387,33 @@ Decisión del usuario: cerrar "integridad financiera" antes de Fase 2, para que 
 | `card_payment` | − | + | No | No |
 | `refund` | + | — | **No** | **Resta** del gasto neto |
 | `adjustment` | + o − (signo del monto) | — | No | No |
+| `financing_installment` | − | — | No | **No** (a propósito) |
 
+- **`financing_installment`** (agregado en el onboarding refinado): el pago puntual de una cuota de `financial_commitments` (ver domain.md). Resta saldo de `account_id` igual que un `expense` (plata real que sale), pero **no** se suma a `monthlyExpense` ni a `useMonthlyActuals` — si se contara ahí, la compra original financiada se duplicaría (una vez como el gasto de la compra, otra vez cada cuota). `commitment_id` (opcional) vincula el pago a su compromiso.
 - **`card_payment`** existe como tipo propio (no un `transfer` genérico) para que los reportes lo puedan distinguir, pero se comporta exactamente igual a `transfer` en los cálculos. El destino debe ser una cuenta `type='credit_card'` (la UI filtra el selector). **Limitación conocida:** todavía no existe el módulo de Tarjetas (Fase 2) que registre las compras/deuda de la tarjeta — el saldo calculado de una cuenta `credit_card` hoy solo refleja los pagos hechos hacia ella, no lo gastado con ella. Se revisa cuando Fase 2 arranque.
 - **`refund`** no es un ingreso nuevo: resta de `monthlyExpense` (dashboard) y del "actual" de `useMonthlyActuals` (presupuesto vs. real) de su categoría — mismo criterio que un gasto que "no llegó a costar tanto". Sí aumenta el saldo de la cuenta (la plata vuelve de verdad).
 - **`adjustment`** es la única categoría donde `amount` puede ser negativo (corrección hacia abajo) — en todos los demás tipos se sigue guardando siempre positivo, con `type` marcando la dirección. Es lo que genera la conciliación básica (ver abajo). No lleva `category_id`.
 
 ### Agregados (dashboard y presupuesto)
 
-- **A nivel moneda del household** (`use-dashboard-summary.ts`): `transfer`/`card_payment` se **ignoran por completo** — mueven plata entre 2 cuentas de la misma moneda (forzado por el trigger), así que su efecto neto sobre "saldo total en esa moneda" es matemáticamente cero. Esto es lo que garantiza los puntos 4 y 5 del pedido del usuario (no alteran ingresos/gastos, no duplican gasto) sin necesitar lógica especial de "exclusión" — simplemente nunca se suman.
-- `monthlyExpense[currency] = SUM(expense) - SUM(refund)` (ambos del mes).
-- `balance[currency] = SUM(income) - SUM(expense) + SUM(refund) + SUM(adjustment con signo)`.
-- **Por cuenta** (`use-account-balances.ts`, nuevo): sí necesita `to_account_id`, a diferencia del agregado por moneda — es la fórmula completa de la tabla de arriba, aplicada por cuenta. Se usa para mostrar el saldo en `/accounts` y para la conciliación.
-- **Presupuesto vs. real** (`use-budgets.ts` → `useMonthlyActuals`): `SUM(expense) - SUM(refund)` por categoría+moneda (antes solo sumaba `expense`).
+- `monthlyExpense[currency] = SUM(expense) - SUM(refund)` (ambos del mes). `financing_installment` **no** entra acá — ver arriba.
+- **Por cuenta** (`use-account-balances.ts`): necesita `to_account_id` (a diferencia de los agregados por moneda) — es la fórmula completa de la tabla de arriba, aplicada por cuenta. Se usa para mostrar el saldo en `/accounts` y para la conciliación.
+- **Presupuesto vs. real** (`use-budgets.ts` → `useMonthlyActuals`): `SUM(expense) - SUM(refund)` por categoría+moneda.
+
+## Dashboard: posición financiera (líquido vs. deuda vs. proyectado)
+
+Pedido explícito del usuario: el dashboard original combinaba el saldo de **todas** las cuentas (incluidas las `credit_card`) en un solo número "Saldo disponible", lo cual es engañoso — un gasto pagado con tarjeta reducía ese número igual que un gasto pagado con plata líquida, mezclando activos con deuda. `use-dashboard-summary.ts` (`useDashboardSummary(month, primaryCurrency)`) ahora calcula, agrupando el saldo por cuenta (mismo mecanismo que `use-account-balances.ts`) por `account.type`:
+
+- **`liquidBalance[currency]`**: suma de cuentas `checking`/`savings`. Es lo único que se muestra como número grande en el dashboard.
+- **`cardDebt[currency]`**: suma de `|saldo|` de cuentas `credit_card` con saldo negativo (positivo = lo que debés). Se muestra aparte, **nunca restado** de `liquidBalance`.
+- **`committedThisMonth[currency]`**: suma de `financial_commitments.amount` activos cuyo `next_payment_date` cae antes de fin de mes.
+- **`expectedIncomeThisMonth[currency]`**: suma de `expected_income.amount` con `expected_date` este mes, sin importar `status` (confirmado o estimado) — es una proyección, no plata ya recibida (eso solo pasa si se convierte en una transacción `income` real).
+- **`cardPaymentsDueThisMonth[currency]`**: por cada `card` con `payment_due_day`, si su próxima ocurrencia (`nextOccurrenceOfDay()`, `lib/date.ts`) cae este mes, se suma `full_payment_amount ?? minimum_payment`. **Limitación conocida:** ese monto es un solo número por tarjeta (no por moneda) — si la tarjeta tiene 2 cuentas vinculadas (dual-moneda), se atribuye a la moneda primaria del hogar en vez de repartirlo; si tiene una sola cuenta vinculada, se usa la moneda de esa cuenta.
+- **`projectedBalance[currency] = liquidBalance + expectedIncomeThisMonth - committedThisMonth - cardPaymentsDueThisMonth`**: "plata disponible ahora + lo que va a entrar − lo que ya sabés que vas a pagar este mes", mostrado como "Proyectado a fin de mes".
+
+`nextOccurrenceOfDay(day)` (`lib/date.ts`) resuelve un "día del mes" (ej. `payment_due_day = 28`) a la fecha real más próxima, recortando al último día del mes si ese día no existe (ej. 31 en febrero).
+
+**Limitación conocida (no es un bug, es alcance de MVP):** no hay expulsión/actualización en tiempo real de "pago ya hecho" — si el usuario paga la tarjeta, `cardPaymentsDueThisMonth` no se recalcula excluyendo ese pago específico hasta que cambie `payment_due_day`/`full_payment_amount` manualmente o pase el mes. Vincular pagos reales a su ciclo de facturación es trabajo de una fase de "Tarjetas" más completa (ver roadmap.md).
 
 ### Conciliación básica (punto 6)
 
@@ -432,17 +489,19 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
   topbar.tsx                    ✅ buscador + notificaciones + AccountMenu (refresh de UI)
   mobile-nav.tsx                ✅ fallback mínimo de navegación en mobile (refresh de UI)
   global-search.tsx             ✅ buscador real sobre cuentas/categorías cacheadas (refresh de UI)
-  onboarding-guard.tsx         ✅ wizard de 5 pasos para usuarios nuevos (ver "Onboarding refinado")
-  /onboarding                  ✅ household/accounts/cards/budget/review-step.tsx + step-shell.tsx
+  onboarding-guard.tsx         ✅ wizard de 7 pasos para usuarios nuevos (ver "Onboarding refinado")
+  /onboarding                  ✅ household/accounts/cards/budget/commitments/income/review-step.tsx + step-shell.tsx
   /household                   ✅ members-list/invite-form/pending-invitations/household-settings-form/ownership-actions
   /settings/notification-toggles.tsx ✅
-  /ui                          ✅ Button, Input, Select, Card, Icon (refresh de UI en icon.tsx)
+  /transactions                 ✅ transaction-form.tsx (reusado por /transactions y AddExpenseButton), add-expense-button.tsx
+  /ui                          ✅ Button, Input, Select, Card, Icon, Modal (refresh de UI en icon.tsx)
 /lib
-  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES, roles, idiomas, formatos
+  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES, TRANSACTION_TYPES, roles, idiomas, formatos
   csv-export.ts                 ✅ exportar transacciones a CSV
+  date.ts                       ✅ todayISO, nextOccurrenceOfDay (día del mes → fecha real)
   /supabase                    ✅ client.ts / server.ts / middleware.ts / admin.ts (service role, solo server)
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
-  /hooks                       ✅ Fase 1, React Query hooks (uno por recurso + use-auth-user-id.ts)
+  /hooks                       ✅ React Query hooks (uno por recurso + use-auth-user-id.ts), incluye use-commitments.ts / use-expected-income.ts
   csv.ts                        ✅ Fase 1-B, parseo de CSV (papaparse)
 /types
   supabase.ts                  ✅ generado con `supabase gen types typescript --linked`

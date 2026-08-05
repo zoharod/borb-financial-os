@@ -8,7 +8,10 @@ import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import { useAccounts } from "@/lib/hooks/use-accounts";
 import { useAccountBalances } from "@/lib/hooks/use-account-balances";
 import { useCards } from "@/lib/hooks/use-cards";
+import { useHouseholdMembers } from "@/lib/hooks/use-household-members";
 import { useBudgets } from "@/lib/hooks/use-budgets";
+import { useCommitments } from "@/lib/hooks/use-commitments";
+import { useExpectedIncome } from "@/lib/hooks/use-expected-income";
 import { currentMonthISO } from "@/lib/hooks/use-dashboard-summary";
 import type { OnboardingStep } from "@/lib/hooks/use-current-household";
 
@@ -27,10 +30,12 @@ function getHouseholdRow(
 
 export function ReviewStep({
   onEditStep,
+  onBack,
   onFinish,
   isFinishing,
 }: {
   onEditStep: (step: OnboardingStep) => void;
+  onBack?: () => void;
   onFinish: () => void;
   isFinishing: boolean;
 }) {
@@ -38,7 +43,10 @@ export function ReviewStep({
   const { data: accounts } = useAccounts();
   const { data: balances } = useAccountBalances();
   const { data: cards } = useCards();
+  const { data: members } = useHouseholdMembers();
   const { data: budgets } = useBudgets(currentMonthISO());
+  const { data: commitments } = useCommitments();
+  const { data: incomes } = useExpectedIncome();
   const [error] = useState<string | null>(null);
 
   const householdRow = getHouseholdRow(household);
@@ -52,10 +60,11 @@ export function ReviewStep({
 
   return (
     <StepShell
-      step={5}
-      total={5}
+      step={7}
+      total={7}
       title="Revisá antes de terminar"
       description="Podés editar cualquier sección antes de confirmar."
+      onBack={onBack}
       wide
     >
       <div className="flex flex-col gap-4 mb-6">
@@ -122,9 +131,13 @@ export function ReviewStep({
                 const cardAccounts = (accounts ?? []).filter(
                   (a) => a.card_id === c.id,
                 );
+                const cardholder = members?.find((m) => m.user_id === c.cardholder_user_id);
                 return (
                   <li key={c.id} className="text-sm">
-                    <p className="text-on-surface">{c.name}</p>
+                    <p className="text-on-surface">
+                      {c.name}
+                      {cardholder ? ` · ${cardholder.profiles?.full_name || "Sin nombre"}` : ""}
+                    </p>
                     {cardAccounts.map((a) => {
                       const bal = balances?.[a.id] ?? 0;
                       return (
@@ -184,6 +197,58 @@ export function ReviewStep({
                 ))}
               </div>
             </>
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-mono text-xs uppercase tracking-wider text-on-surface-variant">
+              Cuotas y compromisos
+            </p>
+            <Button variant="tertiary" onClick={() => onEditStep("commitments")}>
+              Editar
+            </Button>
+          </div>
+          {!commitments || commitments.length === 0 ? (
+            <p className="text-on-surface-variant text-sm">Ninguno agregado.</p>
+          ) : (
+            <ul className="space-y-1">
+              {commitments.map((c) => (
+                <li key={c.id} className="flex justify-between text-sm text-on-surface">
+                  <span>{c.name}</span>
+                  <span className="font-mono">
+                    {Number(c.amount).toFixed(2)} {c.currency}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between mb-2">
+            <p className="font-mono text-xs uppercase tracking-wider text-on-surface-variant">
+              Ingreso esperado
+            </p>
+            <Button variant="tertiary" onClick={() => onEditStep("income")}>
+              Editar
+            </Button>
+          </div>
+          {!incomes || incomes.length === 0 ? (
+            <p className="text-on-surface-variant text-sm">Ninguno agregado.</p>
+          ) : (
+            <ul className="space-y-1">
+              {incomes.map((i) => (
+                <li key={i.id} className="flex justify-between text-sm text-on-surface">
+                  <span>
+                    {i.source} · {i.expected_date}
+                  </span>
+                  <span className="font-mono">
+                    {Number(i.amount).toFixed(2)} {i.currency}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
       </div>

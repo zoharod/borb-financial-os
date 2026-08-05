@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { AddExpenseButton } from "@/components/transactions/add-expense-button";
 
 export const SIDEBAR_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -54,13 +55,7 @@ export function Sidebar() {
         </div>
 
         <div className="mt-auto space-y-4">
-          <Link
-            href="/transactions"
-            className="w-full bg-primary text-on-primary py-3 px-4 rounded-full text-sm font-bold hover:brightness-110 transition-all glow-active flex items-center justify-center gap-2"
-          >
-            <Icon name="add" size={20} />
-            Nueva transacción
-          </Link>
+          <AddExpenseButton className="w-full" />
           <div className="pt-4 border-t border-outline-variant/30 space-y-1">
             <Link
               href="/settings"

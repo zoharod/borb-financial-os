@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { SIDEBAR_LINKS } from "@/components/sidebar";
+import { AddExpenseButton } from "@/components/transactions/add-expense-button";
 
 // El Sidebar nuevo es desktop-first (hidden md:flex, ver components/sidebar.tsx
 // y el pedido "refresh del UI en desktop inicialmente") — esto es el mínimo
@@ -28,6 +29,9 @@ export function MobileNav() {
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute left-0 mt-2 w-56 glass-panel rounded-lg shadow-lg z-20 py-2 flex flex-col">
+            <div className="px-4 pb-2 mb-2 border-b border-outline-variant/30" onClick={() => setOpen(false)}>
+              <AddExpenseButton className="w-full" />
+            </div>
             {SIDEBAR_LINKS.map((link) => {
               const active = pathname === link.href;
               return (

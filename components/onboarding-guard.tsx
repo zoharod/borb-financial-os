@@ -10,6 +10,8 @@ import { HouseholdStep } from "@/components/onboarding/household-step";
 import { AccountsStep } from "@/components/onboarding/accounts-step";
 import { CardsStep } from "@/components/onboarding/cards-step";
 import { BudgetStep } from "@/components/onboarding/budget-step";
+import { CommitmentsStep } from "@/components/onboarding/commitments-step";
+import { IncomeStep } from "@/components/onboarding/income-step";
 import { ReviewStep } from "@/components/onboarding/review-step";
 
 const STEP_ORDER: OnboardingStep[] = [
@@ -17,6 +19,8 @@ const STEP_ORDER: OnboardingStep[] = [
   "accounts",
   "cards",
   "budget",
+  "commitments",
+  "income",
   "review",
   "done",
 ];
@@ -31,12 +35,12 @@ function getPersistedStep(household: HouseholdData): OnboardingStep {
     : "household";
 }
 
-// Onboarding guiado de 5 pasos: household → cuentas → tarjetas →
-// presupuesto → revisión. Cuentas y tarjetas son repetibles ("agregar
-// otra") y tarjetas/presupuesto son opcionales (0 está permitido), así que
-// a diferencia de la v1 (household-guard.tsx) ya no alcanza con inferir el
-// paso actual solo mirando si hay datos — se persiste en
-// households.onboarding_step. Ver architecture.md "Onboarding refinado".
+// Onboarding guiado de 7 pasos: household → cuentas → tarjetas → presupuesto
+// → compromisos → ingreso esperado → revisión. Cuentas/tarjetas son
+// repetibles ("agregar otra") y tarjetas/presupuesto/compromisos/ingreso son
+// opcionales (0 está permitido), así que no alcanza con inferir el paso
+// actual solo mirando si hay datos — se persiste en households.onboarding_step.
+// Ver architecture.md "Onboarding refinado".
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { data: household, isLoading } = useCurrentHousehold();
 
@@ -104,12 +108,44 @@ function OnboardingWizard({
     setLocalStep(step);
   }
 
+  // Ir "Atrás" nunca borra nada: cuentas/tarjetas/presupuesto/compromisos/
+  // ingreso ya están guardados en la base apenas se crean (no en estado local
+  // del componente), así que cambiar de paso solo cambia qué formulario se
+  // ve — los datos ya cargados siguen ahí al volver.
+  function goBackFrom(step: OnboardingStep) {
+    if (editMode) {
+      setLocalStep("review");
+      return;
+    }
+    const prevStep = STEP_ORDER[STEP_ORDER.indexOf(step) - 1];
+    setLocalStep(prevStep);
+  }
+
+  const householdRow = household.households as unknown as {
+    name: string;
+    base_currency_default: "HNL" | "USD";
+    secondary_currency: "HNL" | "USD" | null;
+  } | null;
+
   switch (localStep) {
+    case "household":
+      return (
+        <HouseholdStep
+          onCreated={() => {}}
+          existing={{
+            householdId,
+            name: householdRow?.name ?? "",
+            primaryCurrency: householdRow?.base_currency_default ?? "HNL",
+            secondaryCurrency: householdRow?.secondary_currency ?? null,
+          }}
+          onContinue={() => advanceTo("accounts")}
+        />
+      );
     case "accounts":
       return (
         <AccountsStep
           householdId={householdId}
-          onBack={editMode ? () => setLocalStep("review") : undefined}
+          onBack={() => goBackFrom("accounts")}
           onContinue={() => advanceTo("cards")}
         />
       );
@@ -117,9 +153,7 @@ function OnboardingWizard({
       return (
         <CardsStep
           householdId={householdId}
-          onBack={() =>
-            editMode ? setLocalStep("review") : setLocalStep("accounts")
-          }
+          onBack={() => goBackFrom("cards")}
           onContinue={() => advanceTo("budget")}
         />
       );
@@ -127,9 +161,23 @@ function OnboardingWizard({
       return (
         <BudgetStep
           householdId={householdId}
-          onBack={() =>
-            editMode ? setLocalStep("review") : setLocalStep("cards")
-          }
+          onBack={() => goBackFrom("budget")}
+          onContinue={() => advanceTo("commitments")}
+        />
+      );
+    case "commitments":
+      return (
+        <CommitmentsStep
+          householdId={householdId}
+          onBack={() => goBackFrom("commitments")}
+          onContinue={() => advanceTo("income")}
+        />
+      );
+    case "income":
+      return (
+        <IncomeStep
+          householdId={householdId}
+          onBack={() => goBackFrom("income")}
           onContinue={() => advanceTo("review")}
         />
       );
@@ -137,6 +185,7 @@ function OnboardingWizard({
       return (
         <ReviewStep
           onEditStep={editFromReview}
+          onBack={() => goBackFrom("review")}
           onFinish={() => advanceTo("done")}
           isFinishing={updateStep.isPending}
         />
