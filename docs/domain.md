@@ -84,3 +84,23 @@ Una compra con tarjeta sigue siendo `type='expense'` con `account_id` = la cuent
 - Múltiples tarjetas compartiendo el mismo cupo/cuenta (tarjetas adicionales/suplementarias) — no se modela, asumir 1 tarjeta = 1 cuenta.
 - Intereses, moras, o fechas de corte con lógica de facturación real — Fase 2 solo cubre cashback y recomendación de tarjeta, no un motor de facturación bancaria completo.
 - Conversión de moneda en pagos de tarjeta — sigue la misma regla que transferencias (misma moneda obligatoria, ver `architecture.md` → "Moneda").
+
+## Roles de hogar e invitaciones — implementado (gestión de usuarios/hogar)
+
+A diferencia de las secciones anteriores (modelo financiero), esto es modelo de **gobernanza del hogar**: quién puede hacer qué dentro de un household compartido. Se agregó junto con perfiles/invitaciones/configuración — ver `architecture.md` → "Usuarios, roles e invitaciones al hogar" para el schema y las policies exactas.
+
+### Por qué 4 roles y no 2
+
+El modelo original (`owner`/`member`, sin distinción real de permisos) alcanzaba mientras el hogar tenía como mucho 1-2 personas y ambas necesitaban gestionar todo. Al agregar invitaciones, hace falta poder sumar a alguien con acceso de **solo lectura** (por ejemplo, un contador o un familiar que solo quiere ver el estado de las cuentas sin poder tocar nada) sin exponerle la capacidad de crear/editar/borrar transacciones. De ahí los 4 niveles (`owner > admin > member > viewer`), pensados como una escalera donde cada nivel es un subconjunto estricto de permisos del anterior — ver la tabla completa en `architecture.md`.
+
+### Por qué "1 hogar por usuario" sigue siendo una regla dura
+
+El resto de la app (dashboard, cuentas, transacciones, presupuesto) asume implícitamente "el household del usuario actual" — ninguna pantalla tiene un selector de hogar. Permitir que un usuario pertenezca a 2+ hogares a la vez requeriría ese selector en todos lados, más decidir qué hogar es "el activo" en cada momento — un cambio de arquitectura transversal, no una migración puntual. Por eso `accept_household_invitation` bloquea explícitamente a cualquiera que ya pertenezca a un hogar distinto, con un mensaje claro en vez de dejarlo en un estado ambiguo. Si en el futuro hace falta soportar multi-hogar (ej. una persona que administra las finanzas de 2 hogares distintos), es un rediseño a propósito, no una extensión incremental de este modelo.
+
+### Ciclo de vida de una invitación
+
+`pending → accepted` (feliz) o `pending → cancelled` (quien invitó se arrepiente) o `pending → expired` (pasaron 7 días sin aceptar, se detecta de forma perezosa: la función `accept_household_invitation` chequea `expires_at` en el momento de aceptar y recién ahí marca `expired`, no hay un job periódico que barra invitaciones vencidas). "Reenviar" simplemente vuelve a poner `status='pending'` y extiende `expires_at`, reusando el mismo `token` — no se genera una invitación nueva, así que un link viejo que alguien haya guardado sigue sirviendo después de un reenvío.
+
+### Qué pasa con los datos de alguien removido
+
+Nada se borra de las tablas financieras (`transactions.created_by` sigue apuntando a ese usuario, por ejemplo) — remover a alguien de `household_members` solo le quita acceso de ahí en adelante, no reescribe el historial de quién cargó qué. Esto es consistente con el principio de que `transactions` es un registro histórico inmutable de hechos, no una vista que deba "limpiarse" cuando cambia la membresía del hogar.

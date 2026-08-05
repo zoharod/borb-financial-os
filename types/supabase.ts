@@ -192,6 +192,59 @@ export type Database = {
           },
         ]
       }
+      household_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          household_id: string
+          id: string
+          invited_by: string
+          message: string | null
+          role: string
+          status: string
+          token: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          household_id: string
+          id?: string
+          invited_by: string
+          message?: string | null
+          role: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          household_id?: string
+          id?: string
+          invited_by?: string
+          message?: string | null
+          role?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_invitations_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_members: {
         Row: {
           household_id: string
@@ -222,32 +275,123 @@ export type Database = {
             referencedRelation: "households"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "household_members_user_id_profiles_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       households: {
         Row: {
+          avatar_url: string | null
           base_currency_default: string
           created_at: string
+          default_budget_period: string
+          financial_month_start_day: number
           id: string
           name: string
           onboarding_step: string
           secondary_currency: string | null
         }
         Insert: {
+          avatar_url?: string | null
           base_currency_default?: string
           created_at?: string
+          default_budget_period?: string
+          financial_month_start_day?: number
           id?: string
           name: string
           onboarding_step?: string
           secondary_currency?: string | null
         }
         Update: {
+          avatar_url?: string | null
           base_currency_default?: string
           created_at?: string
+          default_budget_period?: string
+          financial_month_start_day?: number
           id?: string
           name?: string
           onboarding_step?: string
           secondary_currency?: string | null
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          budget_alerts: boolean
+          cashback_opportunities: boolean
+          monthly_summary: boolean
+          payment_reminders: boolean
+          savings_milestones: boolean
+          unusual_transaction_alerts: boolean
+          updated_at: string
+          user_id: string
+          weekly_summary: boolean
+        }
+        Insert: {
+          budget_alerts?: boolean
+          cashback_opportunities?: boolean
+          monthly_summary?: boolean
+          payment_reminders?: boolean
+          savings_milestones?: boolean
+          unusual_transaction_alerts?: boolean
+          updated_at?: string
+          user_id: string
+          weekly_summary?: boolean
+        }
+        Update: {
+          budget_alerts?: boolean
+          cashback_opportunities?: boolean
+          monthly_summary?: boolean
+          payment_reminders?: boolean
+          savings_milestones?: boolean
+          unusual_transaction_alerts?: boolean
+          updated_at?: string
+          user_id?: string
+          weekly_summary?: boolean
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          date_format: string
+          full_name: string | null
+          id: string
+          number_format: string
+          preferred_currency: string | null
+          preferred_language: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          date_format?: string
+          full_name?: string | null
+          id: string
+          number_format?: string
+          preferred_currency?: string | null
+          preferred_language?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          date_format?: string
+          full_name?: string | null
+          id?: string
+          number_format?: string
+          preferred_currency?: string | null
+          preferred_language?: string
+          timezone?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -345,6 +489,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_household_invitation: {
+        Args: { target_token: string }
+        Returns: string
+      }
       create_household_for_current_user: {
         Args: {
           household_name: string
@@ -353,7 +501,73 @@ export type Database = {
         }
         Returns: string
       }
+      create_household_invitation: {
+        Args: {
+          target_email: string
+          target_household_id: string
+          target_message?: string
+          target_role: string
+        }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          household_id: string
+          id: string
+          invited_by: string
+          message: string | null
+          role: string
+          status: string
+          token: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "household_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      delete_household: {
+        Args: { target_household_id: string }
+        Returns: undefined
+      }
+      get_household_member_emails: {
+        Args: { target_household_id: string }
+        Returns: {
+          email: string
+          user_id: string
+        }[]
+      }
+      get_invitation_preview: {
+        Args: { target_token: string }
+        Returns: {
+          expires_at: string
+          household_name: string
+          invited_by_name: string
+          message: string
+          role: string
+          status: string
+        }[]
+      }
+      leave_household: {
+        Args: { target_household_id: string }
+        Returns: undefined
+      }
+      remove_household_member: {
+        Args: { target_member_id: string }
+        Returns: undefined
+      }
+      transfer_household_ownership: {
+        Args: { new_owner_user_id: string; target_household_id: string }
+        Returns: undefined
+      }
       user_household_ids: { Args: never; Returns: string[] }
+      user_household_role: {
+        Args: { target_household_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

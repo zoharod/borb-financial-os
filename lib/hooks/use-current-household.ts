@@ -29,7 +29,7 @@ export function useCurrentHousehold() {
       const { data, error } = await supabase
         .from("household_members")
         .select(
-          "household_id, role, households(name, base_currency_default, secondary_currency, onboarding_step)",
+          "household_id, role, households(name, avatar_url, base_currency_default, secondary_currency, onboarding_step, financial_month_start_day, default_budget_period)",
         )
         .limit(1)
         .maybeSingle();
@@ -59,6 +59,37 @@ export function useCreateHousehold() {
       );
       if (error) throw error;
       return data as string;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["current-household"] });
+    },
+  });
+}
+
+// Configuración del hogar (nombre/avatar/monedas/mes financiero/período de
+// presupuesto) — distinto de useUpdateOnboardingStep: esto es lo que se usa
+// desde /household, requiere rol owner/admin (RLS lo exige, no solo la UI).
+export function useUpdateHouseholdSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      householdId,
+      ...updates
+    }: {
+      householdId: string;
+      name?: string;
+      avatar_url?: string | null;
+      base_currency_default?: string;
+      secondary_currency?: string | null;
+      financial_month_start_day?: number;
+      default_budget_period?: string;
+    }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("households")
+        .update(updates)
+        .eq("id", householdId);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["current-household"] });
