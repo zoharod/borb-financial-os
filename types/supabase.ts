@@ -62,6 +62,83 @@ export type Database = {
           },
         ]
       }
+      budget_template_items: {
+        Row: {
+          category_id: string | null
+          category_name: string | null
+          created_at: string
+          currency: string
+          id: string
+          planned_amount: number
+          template_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string
+          currency: string
+          id?: string
+          planned_amount: number
+          template_id: string
+        }
+        Update: {
+          category_id?: string | null
+          category_name?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          planned_amount?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_template_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_template_items_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "budget_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_templates: {
+        Row: {
+          created_at: string
+          household_id: string
+          id: string
+          is_archived: boolean
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          household_id: string
+          id?: string
+          is_archived?: boolean
+          name: string
+        }
+        Update: {
+          created_at?: string
+          household_id?: string
+          id?: string
+          is_archived?: boolean
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_templates_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           category_id: string
@@ -166,6 +243,7 @@ export type Database = {
       categories: {
         Row: {
           created_at: string
+          group_name: string | null
           household_id: string
           id: string
           is_extra_default: boolean
@@ -173,6 +251,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_name?: string | null
           household_id: string
           id?: string
           is_extra_default?: boolean
@@ -180,6 +259,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_name?: string | null
           household_id?: string
           id?: string
           is_extra_default?: boolean

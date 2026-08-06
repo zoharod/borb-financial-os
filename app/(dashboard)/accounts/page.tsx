@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Modal } from "@/components/ui/modal";
 import { Input, Select, Label } from "@/components/ui/input";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import {
@@ -15,115 +16,39 @@ import {
 } from "@/lib/hooks/use-accounts";
 import { useAccountBalances } from "@/lib/hooks/use-account-balances";
 import { useCreateTransaction } from "@/lib/hooks/use-transactions";
-import { CURRENCIES, ACCOUNT_TYPES as TYPES } from "@/lib/constants";
+import { CURRENCIES, ACCOUNT_TYPES } from "@/lib/constants";
+import { todayISO } from "@/lib/date";
 
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+// Las tarjetas de crédito ahora son su propio módulo (/cards) — son pasivo,
+// no activo, y no se crean/editan más como "cuenta" acá. Ver item 1 del
+// feedback de producto y domain.md "Cuentas vs. Tarjetas".
+const TYPES = ACCOUNT_TYPES.filter((t) => t.value !== "credit_card");
 
 export default function AccountsPage() {
   const { data: household } = useCurrentHousehold();
   const { data: accounts, isLoading } = useAccounts();
   const { data: balances } = useAccountBalances();
-  const createAccount = useCreateAccount();
+  const [addOpen, setAddOpen] = useState(false);
 
-  const [name, setName] = useState("");
-  const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>("HNL");
-  const [type, setType] = useState<(typeof TYPES)[number]["value"]>("checking");
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!household) {
-      setError("No se encontró tu household todavía.");
-      return;
-    }
-
-    try {
-      await createAccount.mutateAsync({
-        household_id: household.household_id,
-        name,
-        currency,
-        type,
-      });
-      setName("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al crear la cuenta");
-    }
-  }
+  const nonCardAccounts = (accounts ?? []).filter((a) => a.type !== "credit_card");
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-on-surface tracking-tight mb-6 flex items-center gap-2">
-        <Icon name="account_balance_wallet" className="text-primary" filled />
-        Cuentas
-      </h1>
-
-      <Card className="mb-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <Label>Nombre</Label>
-            <Input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Pagos L, Ahorro $, ..."
-            />
-          </div>
-
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label>Moneda</Label>
-              <Select
-                value={currency}
-                onChange={(e) =>
-                  setCurrency(e.target.value as (typeof CURRENCIES)[number])
-                }
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Label>Tipo</Label>
-              <Select
-                value={type}
-                onChange={(e) =>
-                  setType(e.target.value as (typeof TYPES)[number]["value"])
-                }
-              >
-                {TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-sm text-error" role="alert">
-              {error}
-            </p>
-          )}
-
-          <Button type="submit" disabled={createAccount.isPending}>
-            {createAccount.isPending ? "Creando..." : "Agregar cuenta"}
-          </Button>
-        </form>
-      </Card>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-on-surface tracking-tight flex items-center gap-2">
+          <Icon name="account_balance_wallet" className="text-primary" filled />
+          Cuentas
+        </h1>
+        <Button onClick={() => setAddOpen(true)}>
+          <Icon name="add" size={18} /> Agregar cuenta
+        </Button>
+      </div>
 
       {isLoading ? (
         <p className="text-on-surface-variant text-sm">Cargando...</p>
-      ) : accounts && accounts.length > 0 ? (
+      ) : nonCardAccounts.length > 0 ? (
         <ul className="space-y-3">
-          {accounts.map((account: Account) => (
+          {nonCardAccounts.map((account: Account) => (
             <li key={account.id}>
               <AccountRow
                 account={account}
@@ -135,10 +60,84 @@ export default function AccountsPage() {
         </ul>
       ) : (
         <p className="text-on-surface-variant text-sm">
-          No hay cuentas todavía. Agregá la primera arriba.
+          No hay cuentas todavía. Agregá la primera con el botón de arriba.
         </p>
       )}
+
+      {addOpen && (
+        <Modal title="Agregar cuenta" onClose={() => setAddOpen(false)}>
+          <AccountForm
+            householdId={household?.household_id}
+            onDone={() => setAddOpen(false)}
+          />
+        </Modal>
+      )}
     </div>
+  );
+}
+
+function AccountForm({
+  householdId,
+  onDone,
+}: {
+  householdId: string | undefined;
+  onDone: () => void;
+}) {
+  const createAccount = useCreateAccount();
+  const [name, setName] = useState("");
+  const [currency, setCurrency] = useState<(typeof CURRENCIES)[number]>("HNL");
+  const [type, setType] = useState<(typeof TYPES)[number]["value"]>("checking");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!householdId) {
+      setError("No se encontró tu household todavía.");
+      return;
+    }
+    try {
+      await createAccount.mutateAsync({ household_id: householdId, name, currency, type });
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear la cuenta");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <Label>Nombre</Label>
+        <Input
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Pagos L, Ahorro $, ..."
+        />
+      </div>
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <Label>Moneda</Label>
+          <Select value={currency} onChange={(e) => setCurrency(e.target.value as (typeof CURRENCIES)[number])}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </Select>
+        </div>
+        <div className="flex-1">
+          <Label>Tipo</Label>
+          <Select value={type} onChange={(e) => setType(e.target.value as (typeof TYPES)[number]["value"])}>
+            {TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      {error && <p className="text-sm text-error" role="alert">{error}</p>}
+      <Button type="submit" disabled={createAccount.isPending}>
+        {createAccount.isPending ? "Creando..." : "Agregar cuenta"}
+      </Button>
+    </form>
   );
 }
 
@@ -272,7 +271,6 @@ function AccountRow({
   const ACCOUNT_ICONS: Record<string, string> = {
     checking: "account_balance",
     savings: "savings",
-    credit_card: "credit_card",
   };
 
   return (

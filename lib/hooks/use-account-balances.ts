@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
+import { SETTLED_TRANSACTION_STATUSES } from "@/lib/constants";
 
 export type AccountBalances = Record<string, number>;
 
@@ -21,7 +22,8 @@ export function useAccountBalances() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("transactions")
-        .select("account_id, to_account_id, type, amount");
+        .select("account_id, to_account_id, type, amount")
+        .in("status", SETTLED_TRANSACTION_STATUSES);
 
       if (error) throw error;
 
@@ -38,6 +40,7 @@ export function useAccountBalances() {
             add(row.account_id, amount);
             break;
           case "expense":
+          case "financing_installment":
             add(row.account_id, -amount);
             break;
           case "adjustment":

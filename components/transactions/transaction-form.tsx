@@ -4,13 +4,18 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Select, Label } from "@/components/ui/input";
 import { useAccounts, type Account } from "@/lib/hooks/use-accounts";
+import { useCards } from "@/lib/hooks/use-cards";
 import { useCategories } from "@/lib/hooks/use-categories";
 import { useCommitments } from "@/lib/hooks/use-commitments";
 import { useCreateTransaction } from "@/lib/hooks/use-transactions";
 import { useCurrentHousehold } from "@/lib/hooks/use-current-household";
 import { useHouseholdMembers } from "@/lib/hooks/use-household-members";
 import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
-import { TRANSACTION_TYPES as TYPES, TRANSFER_LIKE_TYPES } from "@/lib/constants";
+import {
+  TRANSACTION_TYPES as TYPES,
+  TRANSFER_LIKE_TYPES,
+  TRANSACTION_STATUSES,
+} from "@/lib/constants";
 import { todayISO } from "@/lib/date";
 
 type TxType = (typeof TYPES)[number]["value"];
@@ -19,15 +24,24 @@ function isTransferLike(type: string): type is (typeof TRANSFER_LIKE_TYPES)[numb
   return (TRANSFER_LIKE_TYPES as readonly string[]).includes(type);
 }
 
-// Cuentas válidas como destino de una transferencia/pago de tarjeta: misma
-// moneda (no hay conversión, ver architecture.md), distinta de la cuenta de
-// origen, y si es pago de tarjeta, filtrado a cuentas tipo "Tarjeta de crédito".
-function destinationOptions(accounts: Account[], fromAccountId: string, type: TxType) {
+// Cuentas válidas como origen de un pago de tarjeta o de una cuota: nunca
+// otra tarjeta (una tarjeta paga con plata líquida, no con otra deuda) — ver
+// "Pago de tarjeta" en domain.md.
+function sourceAccountOptions(accounts: Account[], type: TxType) {
+  if (type === "card_payment" || type === "financing_installment") {
+    return accounts.filter((a) => a.type !== "credit_card");
+  }
+  return accounts;
+}
+
+// Cuentas válidas como destino de una transferencia: misma moneda (no hay
+// conversión, ver architecture.md), distinta de la cuenta de origen. El pago
+// de tarjeta ya no usa esto — ver el selector tarjeta-primero más abajo.
+function destinationOptions(accounts: Account[], fromAccountId: string) {
   const from = accounts.find((a) => a.id === fromAccountId);
   return accounts.filter((a) => {
     if (a.id === fromAccountId) return false;
     if (from && a.currency !== from.currency) return false;
-    if (type === "card_payment" && a.type !== "credit_card") return false;
     return true;
   });
 }
@@ -43,6 +57,7 @@ export function TransactionForm({
 }) {
   const { data: household } = useCurrentHousehold();
   const { data: accounts } = useAccounts();
+  const { data: cards } = useCards();
   const { data: categories } = useCategories();
   const { data: members } = useHouseholdMembers();
   const { data: commitments } = useCommitments();
@@ -52,11 +67,15 @@ export function TransactionForm({
   const [type, setType] = useState<TxType>(defaultType);
   const [accountId, setAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
+  const [cardId, setCardId] = useState("");
+  const [cardCurrency, setCardCurrency] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [commitmentId, setCommitmentId] = useState("");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [status, setStatus] =
+    useState<(typeof TRANSACTION_STATUSES)[number]["value"]>("confirmed");
   const [memberUserId, setMemberUserId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +86,7 @@ export function TransactionForm({
   const effectiveMemberUserId = memberUserId || currentUserId || "";
 
   const isTransfer = isTransferLike(type);
+  const isCardPayment = type === "card_payment";
   const isInstallment = type === "financing_installment";
 
   const selectedAccount = useMemo(
@@ -79,10 +99,34 @@ export function TransactionForm({
     [categories],
   );
 
-  const destinationAccounts = useMemo(
-    () => destinationOptions(accounts ?? [], accountId, type),
-    [accounts, accountId, type],
+  const sourceAccounts = useMemo(
+    () => sourceAccountOptions(accounts ?? [], type),
+    [accounts, type],
   );
+
+  const destinationAccounts = useMemo(
+    () => destinationOptions(accounts ?? [], accountId),
+    [accounts, accountId],
+  );
+
+  // Pago de tarjeta: primero se elige LA TARJETA (una fila por tarjeta, no
+  // por cuenta-moneda — ver domain.md "Pago de tarjeta"), después la moneda
+  // si esa tarjeta tiene saldo en más de una. La cuenta destino real (para
+  // el insert) se resuelve a partir de esas dos elecciones.
+  const cardCurrencyAccounts = useMemo(
+    () => (accounts ?? []).filter((a) => a.card_id === cardId),
+    [accounts, cardId],
+  );
+  const resolvedCardAccount = useMemo(
+    () =>
+      cardCurrencyAccounts.length === 1
+        ? cardCurrencyAccounts[0]
+        : cardCurrencyAccounts.find((a) => a.currency === cardCurrency),
+    [cardCurrencyAccounts, cardCurrency],
+  );
+  const effectiveToAccountId = isCardPayment
+    ? (resolvedCardAccount?.id ?? "")
+    : toAccountId;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,7 +140,11 @@ export function TransactionForm({
       setError("Elegí una cuenta.");
       return;
     }
-    if (isTransfer && !toAccountId) {
+    if (isCardPayment && !resolvedCardAccount) {
+      setError("Elegí la tarjeta (y la moneda, si tiene más de una) a pagar.");
+      return;
+    }
+    if (isTransfer && !isCardPayment && !toAccountId) {
       setError("Elegí la cuenta destino.");
       return;
     }
@@ -110,7 +158,7 @@ export function TransactionForm({
       await createTransaction.mutateAsync({
         household_id: household.household_id,
         account_id: selectedAccount.id,
-        to_account_id: isTransfer ? toAccountId : null,
+        to_account_id: isTransfer ? effectiveToAccountId : null,
         category_id: isTransfer ? null : resolvedCategoryId,
         commitment_id: isInstallment ? commitmentId || null : null,
         type,
@@ -118,11 +166,14 @@ export function TransactionForm({
         currency: selectedAccount.currency,
         description: description || null,
         transaction_date: date,
+        status,
         created_by: effectiveMemberUserId || undefined,
       });
       setAmount("");
       setDescription("");
       setToAccountId("");
+      setCardId("");
+      setCardCurrency("");
       setCommitmentId("");
       onSuccess?.();
     } catch (err) {
@@ -150,6 +201,8 @@ export function TransactionForm({
             onChange={(e) => {
               setType(e.target.value as TxType);
               setToAccountId("");
+              setCardId("");
+              setCardCurrency("");
             }}
           >
             {TYPES.map((t) => (
@@ -168,6 +221,21 @@ export function TransactionForm({
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
+        <div className="flex-1">
+          <Label>Estado</Label>
+          <Select
+            value={status}
+            onChange={(e) =>
+              setStatus(e.target.value as (typeof TRANSACTION_STATUSES)[number]["value"])
+            }
+          >
+            {TRANSACTION_STATUSES.filter((s) => s.value !== "reconciled").map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       <div className="flex gap-4">
@@ -182,12 +250,17 @@ export function TransactionForm({
             }}
           >
             <option value="">Elegir...</option>
-            {accounts?.map((a) => (
+            {sourceAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.currency})
               </option>
             ))}
           </Select>
+          {accountId === "" && sourceAccounts.length === 0 && (isCardPayment || isInstallment) && (
+            <p className="text-on-surface-variant text-xs mt-1">
+              No hay ninguna cuenta líquida (no-tarjeta) todavía.
+            </p>
+          )}
         </div>
         <div className="flex-1">
           <Label>Monto {selectedAccount ? `(${selectedAccount.currency})` : ""}</Label>
@@ -202,9 +275,50 @@ export function TransactionForm({
         </div>
       </div>
 
-      {isTransfer && (
+      {isCardPayment && (
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <Label>Tarjeta a pagar</Label>
+            <Select
+              required
+              value={cardId}
+              onChange={(e) => {
+                setCardId(e.target.value);
+                setCardCurrency("");
+              }}
+            >
+              <option value="">Elegir...</option>
+              {cards?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {cardCurrencyAccounts.length > 1 && (
+            <div className="flex-1">
+              <Label>Moneda</Label>
+              <Select required value={cardCurrency} onChange={(e) => setCardCurrency(e.target.value)}>
+                <option value="">Elegir...</option>
+                {cardCurrencyAccounts.map((a) => (
+                  <option key={a.id} value={a.currency}>
+                    {a.currency}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
+      {isCardPayment && cardId && cardCurrencyAccounts.length === 0 && (
+        <p className="text-on-surface-variant text-xs -mt-2">
+          Esa tarjeta todavía no tiene saldo cargado en ninguna moneda.
+        </p>
+      )}
+
+      {isTransfer && !isCardPayment && (
         <div>
-          <Label>{type === "card_payment" ? "Tarjeta a pagar" : "Cuenta destino"}</Label>
+          <Label>Cuenta destino</Label>
           <Select required value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}>
             <option value="">Elegir...</option>
             {destinationAccounts.map((a) => (
@@ -215,9 +329,7 @@ export function TransactionForm({
           </Select>
           {accountId && destinationAccounts.length === 0 && (
             <p className="text-on-surface-variant text-xs mt-1">
-              {type === "card_payment"
-                ? 'No hay ninguna cuenta tipo "Tarjeta de crédito" en esta moneda todavía.'
-                : "No hay otra cuenta en la misma moneda todavía."}
+              No hay otra cuenta en la misma moneda todavía.
             </p>
           )}
         </div>

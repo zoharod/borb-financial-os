@@ -5,12 +5,18 @@ import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { AddExpenseButton } from "@/components/transactions/add-expense-button";
 
+// Categorías salió de acá — ahora se gestiona desde dentro de Presupuesto
+// (item 4/9 del feedback de producto: el módulo de Presupuesto es el
+// "workspace" de categorías, no un ítem de nav aparte).
 export const SIDEBAR_LINKS = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/accounts", label: "Cuentas", icon: "account_balance_wallet" },
-  { href: "/categories", label: "Categorías", icon: "sell" },
+  { href: "/cards", label: "Tarjetas", icon: "credit_card" },
   { href: "/transactions", label: "Transacciones", icon: "swap_horiz" },
   { href: "/budgets", label: "Presupuesto", icon: "savings" },
+  { href: "/cashflow", label: "Flujo de caja", icon: "timeline" },
+  { href: "/goals", label: "Metas", icon: "flag" },
+  { href: "/reports", label: "Reportes", icon: "bar_chart" },
 ];
 const LINKS = SIDEBAR_LINKS;
 

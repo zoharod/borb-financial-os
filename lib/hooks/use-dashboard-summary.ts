@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
 import { nextOccurrenceOfDay, todayISO } from "@/lib/date";
+import { SETTLED_TRANSACTION_STATUSES } from "@/lib/constants";
 
 export function currentMonthISO() {
   const d = new Date();
@@ -61,7 +62,8 @@ export function useDashboardSummary(month: string, primaryCurrency: string) {
           supabase.from("accounts").select("id, type, currency, card_id"),
           supabase
             .from("transactions")
-            .select("account_id, to_account_id, type, amount, currency, transaction_date"),
+            .select("account_id, to_account_id, type, amount, currency, transaction_date")
+            .in("status", SETTLED_TRANSACTION_STATUSES),
           supabase
             .from("financial_commitments")
             .select("amount, currency, status, next_payment_date"),

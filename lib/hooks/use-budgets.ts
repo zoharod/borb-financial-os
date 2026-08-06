@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import { useAuthUserId } from "@/lib/hooks/use-auth-user-id";
+import { SETTLED_TRANSACTION_STATUSES } from "@/lib/constants";
 import type { TablesInsert, TablesUpdate } from "@/types/supabase";
 
 export type BudgetWithCategory = {
@@ -63,6 +64,7 @@ export function useMonthlyActuals(month: string) {
         .from("transactions")
         .select("category_id, currency, amount, type")
         .in("type", ["expense", "refund"])
+        .in("status", SETTLED_TRANSACTION_STATUSES)
         .gte("transaction_date", monthStart)
         .lte("transaction_date", monthEnd);
 
@@ -85,9 +87,15 @@ export function useMonthlyActuals(month: string) {
 export function useCreateBudget() {
   const queryClient = useQueryClient();
   return useMutation({
+    // upsert (no insert-only): un presupuesto ya borrado y vuelto a crear
+    // para la misma categoría+mes pisaba el unique(household_id,category_id,
+    // month) y tiraba "ya existe" incluso cuando el delete sí había
+    // funcionado — con upsert, recrear simplemente actualiza el monto.
     mutationFn: async (budget: TablesInsert<"budgets">) => {
       const supabase = createClient();
-      const { error } = await supabase.from("budgets").insert(budget);
+      const { error } = await supabase
+        .from("budgets")
+        .upsert(budget, { onConflict: "household_id,category_id,month" });
       if (error) throw error;
     },
     onSuccess: () => {

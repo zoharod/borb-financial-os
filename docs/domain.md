@@ -11,6 +11,20 @@ Una cuenta es un contenedor de plata con un saldo que se **deriva** de `transact
 
 Esto ya funciona hoy: una compra con tarjeta se puede cargar como `type='expense'` con `account_id` = la cuenta `credit_card` (la resta de esa transacción deja el saldo de la cuenta más negativo, reflejando más deuda), aunque todavía no hay UI que lo sugiera activamente ni cálculo de cashback sobre eso — ver "Fase 2" abajo.
 
+**Cuentas vs. Tarjetas son módulos separados en la UI** (`/accounts` vs. `/cards`): una cuenta es un activo, una tarjeta es un pasivo, y mezclarlas en la misma lista es engañoso a simple vista aunque el mecanismo de cálculo por debajo sea el mismo `transactions`. `/accounts` filtra `type !== 'credit_card'`; `/cards` muestra cada tarjeta con sus cuentas vinculadas. Esto es solo una reorganización de presentación — el modelo de datos de esta sección no cambió.
+
+## Estados de transacción
+
+Una transacción no es un hecho binario "pasó o no pasó" — puede estar `pending` (vas a pagarla pero todavía no se debitó), `scheduled` (fecha futura conocida, ej. el salario del 15), `confirmed` (ya ocurrió de verdad), `reconciled` (ya coincide con el estado de cuenta del banco — usado por la conciliación de `/accounts`/`/cards`) o `cancelled` (se registró pero no va a pasar, se conserva como historial en vez de borrarse). **Regla de dominio:** solo `confirmed` y `reconciled` son "plata real" — cuentan para saldo de cuenta, deuda de tarjeta, e ingreso/gasto real del mes. `pending`/`scheduled` son la materia prima de la proyección de `/cashflow` (junto con `financial_commitments` y `expected_income`), nunca del saldo actual; `cancelled` no cuenta para nada. Ver `architecture.md` → "Estados de transacción" para el detalle de dónde se filtra esto y el bug que corrigió (el estado existía desde Fase 1 pero nunca se respetaba en ningún cálculo).
+
+## Presupuesto: grupos y plantillas
+
+Dos conceptos nuevos, puramente organizativos — no cambian la semántica financiera de `budgets`/`categories`:
+- **Grupo** (`categories.group_name`): una categoría pertenece a una de 11 secciones fijas (Vivienda, Transporte, Salud, Comida, Suscripciones, Personal, Inversiones, Deuda, Ahorro, Extras, Fondos anuales) para que el presupuesto se pueda navegar como "áreas de la vida" en vez de una lista plana.
+- **Plantilla** (`budget_templates`/`budget_template_items`): un conjunto de líneas categoría+monto+moneda reusable mes a mes (ej. "Conservador" vs. "Vacaciones") que se "activa" para un mes puntual, creando/actualizando los `budgets` de ese mes. Una plantilla en sí misma no afecta ningún cálculo — solo existe hasta que se activa.
+
+Ver `architecture.md` → "Presupuesto: grupos y plantillas" para el schema y el fix de un bug real de recreación de presupuestos que se corrigió en el mismo cambio.
+
 ## Transferencias — ya implementado (Fase 1-C)
 
 `type='transfer'`, con `to_account_id` (cuenta destino) obligatorio. Mueve saldo entre 2 cuentas del mismo household y la misma moneda (validado por trigger en la base, no solo en la app — ver `architecture.md` → "Transferencias y tipos de transacción"). No cuenta como ingreso ni gasto.
@@ -103,7 +117,7 @@ financial_commitments (
 
 **Cómo se paga sin duplicar la compra original:** cuando llega la fecha de pago, se registra una transacción `type='financing_installment'` con `commitment_id` apuntando a este compromiso. Esa transacción resta el saldo de la cuenta pagadora (plata real que sale) pero **no** cuenta como `expense` en el dashboard ni en presupuesto vs. real — si contara, la compra financiada se duplicaría (una vez al comprarla, otra vez en cada cuota). Ver architecture.md → "Dashboard: posición financiera".
 
-**No implementado (fuera de alcance de este pase):** avance automático de `next_payment_date`/`remaining_installments` al registrar un pago — hoy es manual (el usuario edita el compromiso). Marcar `status='completed'` también es manual.
+**Avance automático — implementado en `/cashflow`** ("Marcar pagado"): crea la transacción `financing_installment` y en el mismo flujo decrementa `remaining_installments`, avanza `next_payment_date` según `frequency`, y pasa a `status='completed'` cuando ya no quedan cuotas (o la frecuencia es `one_time`). Antes de esto era manual (el usuario editaba el compromiso a mano); ya no.
 
 ## Ingreso esperado (`expected_income`) — implementado
 
@@ -125,7 +139,7 @@ expected_income (
 )
 ```
 
-`status` es informativo (confirmado vs. estimado) — **ninguno de los dos estados afecta el saldo real de ninguna cuenta**; ambos entran en `expectedIncomeThisMonth` de la proyección del dashboard por igual. Cuando la plata efectivamente entra, el flujo correcto es que el usuario registre una transacción `type='income'` normal (no hay conversión automática `expected_income` → `transactions` todavía — es una mejora futura, no un bug: evita el riesgo de contar dos veces si el usuario también carga el ingreso a mano).
+`status` es informativo (confirmado vs. estimado) — **ninguno de los dos estados afecta el saldo real de ninguna cuenta**; ambos entran en `expectedIncomeThisMonth` de la proyección del dashboard por igual. Cuando la plata efectivamente entra, `/cashflow` tiene una acción "Confirmar recibido" que crea la transacción `type='income'` real (hacia `destination_account_id`) **y** pasa este registro a `status='confirmed'` en el mismo paso — a partir de ahí deja de contarse como "próximo" en cualquier pantalla, evitando el riesgo de contarlo dos veces (una como proyección, otra como transacción real). Sigue sin existir una conversión automática/desatendida — la confirmación siempre es una acción explícita del usuario.
 
 ## Compras con tarjeta — Fase 2, no implementado
 

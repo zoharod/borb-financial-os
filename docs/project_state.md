@@ -2,8 +2,8 @@
 
 > Este archivo es la memoria de trabajo del proyecto. Se actualiza al final de cada sesión de desarrollo. Claude Code debe leer este archivo ANTES de escribir código en cualquier sesión.
 
-**Última actualización:** 2026-08-05
-**Fase actual:** Fase 1-C ✅ + Onboarding refinado (7 pasos, con compromisos e ingreso esperado) ✅ + Gestión de usuarios/hogar ✅ + Refresh de UI (desktop) ✅ + Dashboard con posición financiera real (líquido/deuda/proyectado) ✅ — listo para arrancar Fase 2 (Tarjetas y Cashback); queda pendiente borrar usuarios de prueba cuando el usuario lo confirme, decidir si se agrega un proveedor de email transaccional para invitar a usuarios ya existentes por correo (hoy usan un link manual, Resend configurado en modo sandbox), y hacer la pasada de diseño responsive para mobile (el refresh de UI fue desktop-first)
+**Última actualización:** 2026-08-06
+**Fase actual:** Todo lo de abajo ✅, más la evolución a "Financial OS" ✅ (Tarjetas como módulo propio, Presupuesto con grupos/plantillas, Flujo de caja, estados de transacción reales, navegación de 8 módulos) — el modelo de cuentas/tarjetas/transacciones que le faltaba a Fase 2 (Cashback) ya está listo para que esa fase extienda `cards`/`transactions.card_id`, no para crearlos de cero. Queda pendiente borrar usuarios de prueba cuando el usuario lo confirme, decidir sobre un proveedor de email transaccional con dominio propio, y la pasada de diseño responsive para mobile.
 
 ---
 
@@ -101,18 +101,33 @@
   - **Limitaciones conocidas, documentadas a propósito** (ver `architecture.md`): `cardPaymentsDueThisMonth` atribuye el monto de una tarjeta dual-moneda a la moneda primaria del household (no se puede repartir un solo número entre 2 monedas sin más info); no hay conversión automática de `expected_income` confirmado a una transacción real (evita contarlo dos veces); no hay avance automático de `next_payment_date`/`remaining_installments` de un compromiso al pagarlo (es manual).
   - Build y lint limpios. Verificado de punta a punta en navegador con un usuario de prueba nuevo (`test-onboarding4@borb.test`).
 
+- [x] **Evolución a "Financial OS" — feedback de producto explícito del usuario (9 puntos + 2 pedidos en español sobre Flujo de Caja y estados de transacción), con instrucción explícita de preferir arquitectura limpia a largo plazo por sobre el mínimo pedido.**
+  - **Schema nuevo**: `categories.group_name` (11 grupos fijos); `budget_templates`/`budget_template_items`; `transactions.status` amplía de `('confirmed','pending')` a `('pending','scheduled','confirmed','reconciled','cancelled')`.
+  - **Bug real de fondo encontrado: `status` existía desde Fase 1 pero ningún cálculo lo filtraba** — hasta una transacción `'pending'` ya contaba como saldo real. Fix: `SETTLED_TRANSACTION_STATUSES = ['confirmed','reconciled']` agregado a `use-account-balances.ts`, `use-dashboard-summary.ts` y `useMonthlyActuals`. Ver `architecture.md` → "Estados de transacción".
+  - **Cuentas vs. Tarjetas, módulos separados**: `/accounts` ahora filtra `type !== 'credit_card'` (antes las mezclaba, inconsistente con dashboard/onboarding que sí las excluían); nueva página `/cards` dedicada (bank/cardholder/last4/saldo/vencimientos/límite, cashback como "Próximamente", acción de corrección de saldo).
+  - **Pago de tarjeta, selector tarjeta-primero**: antes listaba cuentas crudas, así que una tarjeta dual-moneda aparecía 2 veces ("Tarjeta (HNL)"/"Tarjeta (USD)"). Fix en `TransactionForm`: se elige la tarjeta primero (una opción por tarjeta), la moneda después solo si aplica; la cuenta origen excluye tarjetas para `card_payment`/`financing_installment`.
+  - **Bug real corregido: recrear un presupuesto borrado reportaba "ya existe".** `useCreateBudget` pasó de `insert` a `.upsert(..., {onConflict: 'household_id,category_id,month'})` — arreglo de arquitectura, no parche puntual (ver `architecture.md` → "Presupuesto: grupos y plantillas").
+  - **Presupuesto rediseñado**: grupos colapsables (`categories.group_name`) con total planeado/real/restante por grupo; tarjetas de resumen (presupuesto mensual, ingreso esperado, comprometido, disponible restante, ahorro proyectado, tasa de ahorro, % usado, categorías excedidas, categorías más grandes); plantillas reusables con crear/editar líneas/duplicar/archivar/"activar para el mes".
+  - **`/cashflow` nuevo** (absorbe lo que hubiera sido "Upcoming Payments" — misma data): línea de tiempo de ingreso esperado + compromisos + vencimientos de tarjeta hasta un horizonte elegible por el usuario, saldo proyectado corriendo. "Marcar pagado" en un compromiso ahora crea la transacción real **y** avanza `next_payment_date`/`remaining_installments` automáticamente (antes era manual). "Confirmar recibido" en un ingreso esperado crea la transacción `income` real y lo saca de "próximos".
+  - **Accounts/Transactions simplificados**: formularios inline reemplazados por botón "+ Agregar" → modal (`AccountForm`, `AddExpenseButton` ya existía). Transacciones ganó filtros (cuenta/categoría/miembro/tipo/moneda/estado/fecha) + búsqueda + agrupar por cuenta o tipo.
+  - **Navegación reorganizada** a 8 módulos: Dashboard/Cuentas/Tarjetas/Transacciones/Presupuesto/Flujo de caja/Metas/Reportes — Categorías sale del nav principal (se gestiona desde Presupuesto); Metas y Reportes son placeholders honestos "Próximamente" (Fase 3, sin spec de producto todavía, no fabricado a medias).
+  - **Bug real de UI encontrado durante la verificación (no relacionado a esta feature, pero bloqueaba probarla): el TopBar fijo tapaba los primeros ~40px de cada página.** `app/(dashboard)/layout.tsx` tenía `pt-16` compitiendo con `p-4 md:p-6` por `padding-top` — Tailwind resolvía el shorthand como ganador (24px reales en vez de 64px), dejando cualquier botón en la primera fila de una página geométricamente debajo del TopBar y sin poder clickearlo, sin ningún error en consola. Se detectó al automatizar clicks en el navegador para verificar esta misma tarea. Fix: separar `pt-16` de `px-4 md:px-6 pb-4 md:pb-6`. Ver `architecture.md` → "Sistema de diseño" para el detalle completo (mismo patrón que la colisión de `max-w-sm` de una sesión anterior).
+  - **Verificado en navegador de punta a punta con datos reales** (`test-b@borb.test`, Casa Test B): tarjeta nueva creada vía `/cards` con deuda inicial 200 HNL → compra de 50 HNL con esa tarjeta (categoría Comida) → dashboard confirma deuda 250, líquido sin cambios, presupuesto de Comida sube exactamente 50 → pago de 250 HNL de la tarjeta desde Ahorro L (selector tarjeta-primero, cuenta-tarjeta correctamente excluida como origen) → líquido baja 250, deuda baja a 0, **presupuesto de Comida queda exactamente igual** (sin doble conteo, criterio de salida cumplido). Grupos de presupuesto, plantilla completa (crear/agregar línea/activar), y ciclo completo de un compromiso en `/cashflow` (crear → marcar pagado → next_payment_date avanza un mes, cuotas restantes decrementa) verificados también.
+  - Build y lint limpios.
+
 ## 🔄 En progreso
 
 - **Limpiar usuarios de prueba:** pendiente que el usuario confirme que ya no los necesita antes de borrarlos (no es bloqueante para Fase 2).
 
 ## ⏭️ Siguiente (próxima sesión)
 
-1. Arrancar Fase 2 (Tarjetas y Cashback) usando `docs/domain.md` como base del schema (`card_cashback_rules`, uso de `transactions.card_id`) — leerlo antes de escribir la migración. La tabla `cards` y el vínculo `accounts.card_id` ya existen (creados en el onboarding refinado), así que Fase 2 arranca extendiendo ese schema, no creándolo de cero.
-2. Preguntarle al usuario si quiere agregar un proveedor de email transaccional (Resend, Postmark, etc.) para poder invitar por correo a usuarios que ya tienen cuenta Borb — hoy ese caso genera un link para compartir manualmente (ver "Usuarios, roles e invitaciones" en `architecture.md`). Resend ya está integrado (`lib/resend.ts`) pero en modo sandbox (solo entrega al propio email de la cuenta) hasta que se verifique un dominio propio. No bloqueante.
-3. Pasada de diseño responsive para mobile (el refresh de UI fue desktop-first, por pedido explícito del usuario) — `MobileNav` es solo un fallback funcional, no una versión pulida del layout nuevo para pantallas chicas.
-4. Considerar una forma de convertir `expected_income` confirmado en una transacción real con un clic (hoy es manual) y de avanzar `financial_commitments.next_payment_date` automáticamente al registrar el pago de una cuota — mejoras de UX, no bloqueantes.
-5. Preguntarle al usuario en algún momento si ya quiere que borre los usuarios de prueba (`test-a`, `test-b`, `test-invite2`, `test-onboarding4`) — no bloqueante, se puede hacer en paralelo a Fase 2.
-6. Los usuarios/households de prueba en la base (local y producción): `test-a@borb.test` (Casa Test A), `test-b@borb.test` (Casa Test B, dueño — 3 cuentas, varias transacciones de los 6 tipos), `test-invite2@borb.test` (creado para probar invitaciones, actualmente sin hogar tras la prueba de remoción), `test-onboarding4@borb.test` (Casa Onboarding V4, usado para verificar el onboarding de 7 pasos y el dashboard nuevo), todos con password `TestPass123!`.
+1. Arrancar Fase 2 (Cashback) usando `docs/domain.md` como base (`card_cashback_rules`, uso de `transactions.card_id`) — leerlo antes de escribir la migración. `cards`, `accounts.card_id`, y ahora el módulo `/cards` completo ya existen, así que Fase 2 solo agrega reglas de cashback sobre ese schema, no lo crea de cero.
+2. Preguntarle al usuario si quiere agregar un proveedor de email transaccional con dominio propio verificado (Resend ya está integrado en `lib/resend.ts`, pero en modo sandbox — solo entrega al propio email de la cuenta) para poder invitar por correo a usuarios que ya tienen cuenta Borb. No bloqueante.
+3. Pasada de diseño responsive para mobile (el refresh de UI fue desktop-first, por pedido explícito del usuario) — `MobileNav` es solo un fallback funcional.
+4. Diseñar Metas (Fase 3) y Reportes (Fase 3) cuando el usuario tenga spec de producto para ellos — hoy son placeholders honestos en el nav, no hay nada que extender todavía.
+5. Considerar exponer "reconciled" como estado explícito en la conciliación de `/accounts`/`/cards` (hoy esas acciones siguen creando transacciones `confirmed`, que ya cuentan igual en `SETTLED_TRANSACTION_STATUSES` — no es un bug, solo una distinción más precisa posible a futuro).
+6. Preguntarle al usuario en algún momento si ya quiere que borre los usuarios de prueba — no bloqueante, se puede hacer en paralelo a Fase 2.
+7. Los usuarios/households de prueba en la base (local y producción): `test-a@borb.test` (Casa Test A), `test-b@borb.test` (Casa Test B, dueño — usada en esta sesión para verificar tarjetas/presupuesto/flujo de caja con datos reales), `test-invite2@borb.test`, `test-onboarding4@borb.test`, todos con password `TestPass123!`.
 
 ## 📌 Decisiones clave registradas (no reabrir sin razón nueva)
 
@@ -146,7 +161,7 @@ Las 4 screens traídas de Stitch (`docs/design/screens/`) representan la **visi�
 
 ## 🚫 Explícitamente fuera de alcance (no implementar sin re-abrir el PRD)
 
-Importación CSV (hasta Fase 1-B), tarjetas/cashback (Fase 2), gastos anuales/fondos (Fase 2), metas de ahorro (Fase 3), reportes avanzados (Fase 3), lectura de correo/OCR/PDF/SMS (Fase 4), alertas proactivas/IA/simulaciones/motor de reglas (Fase 5), offline completo (no planeado, re-evaluar si se necesita).
+Cashback (Fase 2 — el módulo de Tarjetas en sí ya está implementado, ver "Evolución a Financial OS"), gastos anuales/fondos fuera de lo que ya cubre "Fondos anuales" como grupo de presupuesto (Fase 2), metas de ahorro (Fase 3, placeholder en nav), reportes avanzados (Fase 3, placeholder en nav), lectura de correo/OCR/PDF/SMS (Fase 4), alertas proactivas/IA/simulaciones/motor de reglas (Fase 5), offline completo (no planeado, re-evaluar si se necesita).
 
 ## 🧭 Regla de oro para Claude Code
 

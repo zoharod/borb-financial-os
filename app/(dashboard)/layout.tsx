@@ -23,7 +23,13 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="flex-1 md:ml-64 min-h-screen flex flex-col relative">
         <Topbar />
-        <main className="flex-1 pt-16 p-4 md:p-6 flex flex-col max-w-[1600px] w-full mx-auto">
+        {/* pt-16 y px/pb por separado, nunca "p-*" a secas acá: un shorthand
+            de padding-en-todos-los-lados compite por padding-top contra
+            pt-16 y gana en el CSS generado de Tailwind sin importar el orden
+            en el className — bug real encontrado al ver botones "+ Agregar"
+            tapados por el TopBar fijo (los primeros ~40px de cada página
+            quedaban debajo del TopBar, sin poder hacerles click). */}
+        <main className="flex-1 pt-16 px-4 md:px-6 pb-4 md:pb-6 flex flex-col max-w-[1600px] w-full mx-auto">
           <OnboardingGuard>{children}</OnboardingGuard>
         </main>
       </div>

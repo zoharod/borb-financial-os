@@ -313,6 +313,9 @@ categories (
   household_id uuid fk,
   name text,
   is_extra_default boolean default false,
+  group_name text null, -- agregado en "Financial OS": ver "Presupuesto: grupos y plantillas"
+    -- check: 'vivienda'|'transporte'|'salud'|'comida'|'suscripciones'|'personal'|
+    --        'inversiones'|'deuda'|'ahorro'|'extras'|'fondos_anuales' | null (= "Sin grupo")
   created_at timestamptz
 )
 
@@ -324,6 +327,25 @@ budgets (
   planned_amount numeric,
   currency text,
   unique(household_id, category_id, month)
+)
+
+budget_templates (
+  -- agregado en "Financial OS" — ver "Presupuesto: grupos y plantillas"
+  id uuid pk,
+  household_id uuid fk,
+  name text, -- "Conservador", "Vacaciones", ...
+  is_archived boolean default false,
+  created_at timestamptz
+)
+
+budget_template_items (
+  id uuid pk,
+  template_id uuid fk -> budget_templates on delete cascade,
+  category_id uuid fk -> categories null, -- on delete set null
+  category_name text null, -- fallback si category_id es null (categoría personalizada no creada todavía)
+  planned_amount numeric,
+  currency text,
+  created_at timestamptz
 )
 
 transactions (
@@ -339,9 +361,9 @@ transactions (
   description text,
   transaction_date date,
   created_by uuid fk -> auth.users,
-  status text default 'confirmed', -- 'confirmed' | 'pending'
+  status text default 'confirmed', -- 'pending'|'scheduled'|'confirmed'|'reconciled'|'cancelled' (ampliado en "Financial OS", ver "Estados de transacción")
   source text default 'manual', -- reservado: 'manual'|'csv'|'email'|'ocr'|'sms'
-  card_id uuid null, -- reservado para Fase 2 (tarjetas)
+  card_id uuid null, -- reservado, sin uso (no confundir con accounts.card_id ni cards.id)
   reconciled_at timestamptz null, -- se usa desde Fase 1-C en ajustes de conciliación
   created_at timestamptz,
   updated_at timestamptz
@@ -390,7 +412,7 @@ Decisión del usuario: cerrar "integridad financiera" antes de Fase 2, para que 
 | `financing_installment` | − | — | No | **No** (a propósito) |
 
 - **`financing_installment`** (agregado en el onboarding refinado): el pago puntual de una cuota de `financial_commitments` (ver domain.md). Resta saldo de `account_id` igual que un `expense` (plata real que sale), pero **no** se suma a `monthlyExpense` ni a `useMonthlyActuals` — si se contara ahí, la compra original financiada se duplicaría (una vez como el gasto de la compra, otra vez cada cuota). `commitment_id` (opcional) vincula el pago a su compromiso.
-- **`card_payment`** existe como tipo propio (no un `transfer` genérico) para que los reportes lo puedan distinguir, pero se comporta exactamente igual a `transfer` en los cálculos. El destino debe ser una cuenta `type='credit_card'` (la UI filtra el selector). **Limitación conocida:** todavía no existe el módulo de Tarjetas (Fase 2) que registre las compras/deuda de la tarjeta — el saldo calculado de una cuenta `credit_card` hoy solo refleja los pagos hechos hacia ella, no lo gastado con ella. Se revisa cuando Fase 2 arranque.
+- **`card_payment`** existe como tipo propio (no un `transfer` genérico) para que los reportes lo puedan distinguir, pero se comporta exactamente igual a `transfer` en los cálculos. El destino debe ser una cuenta `type='credit_card'` (la UI filtra el selector). Una compra hecha con la tarjeta ya se registra como `type='expense'` con `account_id` = la cuenta `credit_card` correspondiente (esto sí existe desde Fase 1-C) — el pago posterior nunca vuelve a tocar esa categoría, solo mueve plata de la cuenta líquida hacia la deuda (ver "Estados de transacción" y `domain.md` "Pago de tarjeta" para el selector tarjeta-primero de la UI).
 - **`refund`** no es un ingreso nuevo: resta de `monthlyExpense` (dashboard) y del "actual" de `useMonthlyActuals` (presupuesto vs. real) de su categoría — mismo criterio que un gasto que "no llegó a costar tanto". Sí aumenta el saldo de la cuenta (la plata vuelve de verdad).
 - **`adjustment`** es la única categoría donde `amount` puede ser negativo (corrección hacia abajo) — en todos los demás tipos se sigue guardando siempre positivo, con `type` marcando la dirección. Es lo que genera la conciliación básica (ver abajo). No lleva `category_id`.
 
@@ -399,6 +421,17 @@ Decisión del usuario: cerrar "integridad financiera" antes de Fase 2, para que 
 - `monthlyExpense[currency] = SUM(expense) - SUM(refund)` (ambos del mes). `financing_installment` **no** entra acá — ver arriba.
 - **Por cuenta** (`use-account-balances.ts`): necesita `to_account_id` (a diferencia de los agregados por moneda) — es la fórmula completa de la tabla de arriba, aplicada por cuenta. Se usa para mostrar el saldo en `/accounts` y para la conciliación.
 - **Presupuesto vs. real** (`use-budgets.ts` → `useMonthlyActuals`): `SUM(expense) - SUM(refund)` por categoría+moneda.
+
+## Estados de transacción
+
+Pedido explícito del usuario ("las transacciones necesitan estados"). `transactions.status` **ya existía** desde Fase 1 (`'confirmed'`/`'pending'`) pero **ningún cálculo lo respetaba** — todas las queries de saldo/presupuesto leían la tabla sin filtrar por `status` en absoluto, así que hasta una fila `'pending'` ya contaba como plata real. Era un bug latente, no una feature a medias.
+
+Fix de dos partes:
+
+1. **Ampliar el check constraint** a `'pending' | 'scheduled' | 'confirmed' | 'reconciled' | 'cancelled'` (`TRANSACTION_STATUSES` en `lib/constants.ts`).
+2. **Filtrar por estado en TODA query que calcule plata real** — `SETTLED_TRANSACTION_STATUSES = ['confirmed', 'reconciled']` (`lib/constants.ts`), agregado a: `use-account-balances.ts`, `use-dashboard-summary.ts` (saldo líquido/deuda/agregados mensuales), `use-budgets.ts` → `useMonthlyActuals`. `pending`/`scheduled` quedan visibles en `/transactions` y alimentan la proyección de `/cashflow`, pero no mueven ningún número "real" hasta pasar a `confirmed`; `cancelled` queda como registro histórico sin efecto en ningún cálculo.
+
+`TransactionForm` expone un selector "Estado" (default `confirmed`); `reconciled` no es seleccionable a mano ahí — se reserva para lo que ya crea la conciliación de `/accounts`/`/cards` (que podría empezar a usarlo en vez de `confirmed` en una iteración futura, sin romper nada, ya que ambos valores están en `SETTLED_TRANSACTION_STATUSES`).
 
 ## Dashboard: posición financiera (líquido vs. deuda vs. proyectado)
 
@@ -418,6 +451,27 @@ Pedido explícito del usuario: el dashboard original combinaba el saldo de **tod
 ### Conciliación básica (punto 6)
 
 En `/accounts`, cada cuenta tiene una acción "Conciliar": el usuario ingresa el saldo real (el que le dice el banco), se muestra la diferencia contra el saldo calculado, y un botón crea una transacción `type='adjustment'` por esa diferencia (con `reconciled_at = now()` y descripción "Conciliación de saldo"). No es conciliación transacción-por-transacción (eso excede "básica" del roadmap) — es una corrección puntual al saldo total de la cuenta.
+
+## Tarjetas como módulo propio (`/cards`)
+
+Pedido explícito del usuario: "las cuentas son activo, las tarjetas son pasivo" — no deben mezclarse en la misma pantalla. `/accounts` ahora filtra `type !== 'credit_card'` (antes las mostraba mezcladas, un bug real ya que el dashboard y la revisión del onboarding sí las excluían — inconsistencia entre pantallas). `/cards` es la pantalla dedicada, lee de `cards` (no de `accounts` directamente) y por cada tarjeta muestra sus cuentas vinculadas (`accounts.card_id`) con saldo actual, y una acción "Corregir" (mismo mecanismo de `adjustment` que la conciliación de `/accounts`). Cashback se muestra como "Próximamente" — no hay motor de reglas de cashback todavía (sigue siendo Fase 2 real, ver `domain.md`).
+
+**Pago de tarjeta, selector tarjeta-primero:** antes el selector de destino de un `card_payment` listaba `accounts` directamente, así que una tarjeta con saldo en 2 monedas aparecía **dos veces** ("MC Conecta (HNL)", "MC Conecta (USD)") — confuso, y no correspondía al modelo real (una tarjeta es una entidad, sus cuentas por moneda son un detalle interno). Fix en `TransactionForm`: cuando `type='card_payment'`, primero se elige la **tarjeta** (`useCards()`, una opción por tarjeta), y solo si esa tarjeta tiene más de una cuenta vinculada aparece un selector de moneda; la cuenta destino real se resuelve internamente (`resolvedCardAccount`) a partir de esas 2 elecciones. Además, el selector de cuenta **origen** ahora excluye cuentas `type='credit_card'` cuando el tipo es `card_payment` o `financing_installment` (`sourceAccountOptions()`) — una tarjeta no puede pagarse con otra tarjeta.
+
+## Presupuesto: grupos y plantillas
+
+- **Grupos** (`categories.group_name`): 11 secciones fijas (Vivienda, Transporte, Salud, Comida, Suscripciones, Personal, Inversiones, Deuda, Ahorro, Extras, Fondos anuales) + "Sin grupo". `/budgets` agrupa los presupuestos del mes por el grupo de su categoría, cada grupo colapsable, con su propio total planeado/real/restante. Asignar el grupo es una acción por-categoría (select inline junto a cada línea de presupuesto), no un paso obligatorio del onboarding.
+- **Bug real corregido: "eliminar y volver a crear un presupuesto reporta que ya existe".** `useCreateBudget` hacía `insert` puro contra `unique(household_id, category_id, month)` — si el usuario borraba un presupuesto y volvía a cargar uno para la misma categoría+mes (o simplemente quería actualizar el monto sin pasar por "editar"), cualquier fila que ya existiera (borrada a medias por un fallo silencioso anterior, o simplemente ya existente) tiraba una violación de constraint real. Fix a nivel arquitectura, no parche puntual: `useCreateBudget` ahora usa `.upsert(budget, {onConflict: 'household_id,category_id,month'})` — crear para una categoría+mes que ya tiene presupuesto simplemente actualiza el monto, nunca puede fallar por "ya existe". `useActivateBudgetTemplate` (abajo) reusa el mismo upsert.
+- **Plantillas** (`budget_templates` + `budget_template_items`): un template es una lista de líneas categoría+monto+moneda, reusable mes a mes ("Conservador", "Vacaciones", etc.). Duplicar copia todas las líneas a un template nuevo independiente. Archivar es un flag (`is_archived`), no un borrado. "Activar para el mes" recorre las líneas del template y hace upsert de cada una como `budgets` del mes elegido (creando la categoría primero si la línea todavía no tiene `category_id`, solo `category_name`) — mismo mecanismo de upsert que el punto anterior, así que activar un template dos veces seguidas para el mismo mes no falla, solo re-aplica los montos.
+
+## Flujo de caja (`/cashflow`)
+
+Pedido explícito del usuario: "¿cuánto dinero tendré el 15 de agosto?" no tenía respuesta — el dashboard solo mostraba "este mes". `/cashflow` junta 3 fuentes (`expected_income` no confirmado, `financial_commitments` activos, y el próximo vencimiento de cada `card`) en una sola línea de tiempo ordenada por fecha, hasta un horizonte que el usuario elige (no fijo a fin de mes). El "saldo proyectado" corre desde `liquidBalance` actual (mismo cálculo que el dashboard, ya filtrado a estados confirmados) aplicando cada evento en orden — responde directamente "cuánto me queda libre después de todos los compromisos" para cualquier fecha futura, no solo fin de mes.
+
+Absorbe lo que hubiera sido un módulo separado de "Upcoming Payments" — son la misma data (compromisos + vencimientos de tarjeta + ingreso esperado), así que se construyó una sola pantalla en vez de dos superpuestas.
+
+- **"Marcar pagado" en un compromiso**: crea la transacción `financing_installment` real (cuenta = `financial_commitments.account_id`, obligatorio para poder marcarlo — si no está asignada, la UI pide editarlo primero) y actualiza el compromiso: decrementa `remaining_installments`, avanza `next_payment_date` según `frequency` (`advanceDate()` en `lib/date.ts`), y pasa a `status='completed'` si ya no quedan cuotas o la frecuencia es `one_time`.
+- **"Confirmar recibido" en un ingreso esperado**: crea la transacción `income` real (cuenta = `expected_income.destination_account_id`, mismo requisito) y pasa `expected_income.status` a `'confirmed'` — a partir de ahí deja de aparecer como "próximo" en cualquier pantalla (dashboard y cashflow filtran `status !== 'confirmed'`), consistente con la regla de `domain.md`: un ingreso esperado no cuenta como recibido hasta convertirse en transacción real.
 
 ## Importación CSV (Fase 1-B)
 
@@ -474,18 +528,22 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
   /api/account/delete          ✅ elimina la cuenta del usuario (service role)
   /(dashboard)/layout.tsx      ✅ (guard de auth + header + nav + OnboardingGuard)
   /(dashboard)/dashboard       ✅ Fase 1
-  /(dashboard)/accounts        ✅ Fase 1 (CRUD + edición inline)
-  /(dashboard)/transactions    ✅ Fase 1 (CRUD + edición inline)
+  /(dashboard)/accounts        ✅ Fase 1 (solo activos — checking/savings; tarjetas viven en /cards)
+  /(dashboard)/cards           ✅ módulo de tarjetas (ver "Tarjetas como módulo propio")
+  /(dashboard)/transactions    ✅ Fase 1 (filtros/búsqueda/agrupado + modal "+ Agregar")
   /(dashboard)/transactions/import ✅ Fase 1-B, importación CSV
-  /(dashboard)/budgets         ✅ Fase 1
-  /(dashboard)/categories      ✅ Fase 1 (CRUD + edición inline)
+  /(dashboard)/budgets         ✅ grupos + plantillas + resumen (ver "Presupuesto: grupos y plantillas")
+  /(dashboard)/cashflow        ✅ línea de tiempo proyectada + compromisos/ingreso esperado (ver "Flujo de caja")
+  /(dashboard)/goals           ✅ placeholder "Próximamente" (Fase 3, sin spec de producto todavía)
+  /(dashboard)/reports         ✅ placeholder "Próximamente" (Fase 3, sin spec de producto todavía)
+  /(dashboard)/categories      ✅ Fase 1 (CRUD + edición inline; ya no en el nav principal, se llega desde /budgets)
   /(dashboard)/profile         ✅ perfil personal, email, eliminar cuenta
   /(dashboard)/household       ✅ miembros, invitar, roles, configuración del hogar
   /(dashboard)/settings        ✅ hub de configuración (ver "Usuarios, roles e invitaciones")
 /components
   sign-out-button.tsx          ✅ (limpia queryClient + IndexedDB)
   account-menu.tsx              ✅ menú de usuario (Perfil/Hogar/Configuración/Salir)
-  sidebar.tsx                   ✅ nav principal desktop (refresh de UI, reemplaza nav-links.tsx)
+  sidebar.tsx                   ✅ nav: Dashboard/Cuentas/Tarjetas/Transacciones/Presupuesto/Flujo de caja/Metas/Reportes
   topbar.tsx                    ✅ buscador + notificaciones + AccountMenu (refresh de UI)
   mobile-nav.tsx                ✅ fallback mínimo de navegación en mobile (refresh de UI)
   global-search.tsx             ✅ buscador real sobre cuentas/categorías cacheadas (refresh de UI)
@@ -493,15 +551,15 @@ HNL y USD se tratan como monedas **independientes**, sin conversión automática
   /onboarding                  ✅ household/accounts/cards/budget/commitments/income/review-step.tsx + step-shell.tsx
   /household                   ✅ members-list/invite-form/pending-invitations/household-settings-form/ownership-actions
   /settings/notification-toggles.tsx ✅
-  /transactions                 ✅ transaction-form.tsx (reusado por /transactions y AddExpenseButton), add-expense-button.tsx
+  /transactions                 ✅ transaction-form.tsx (reusado por /transactions, AddExpenseButton y las acciones rápidas del dashboard), add-expense-button.tsx
   /ui                          ✅ Button, Input, Select, Card, Icon, Modal (refresh de UI en icon.tsx)
 /lib
-  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES, TRANSACTION_TYPES, roles, idiomas, formatos
+  constants.ts                  ✅ CURRENCIES, ACCOUNT_TYPES, CARD_NETWORKS, BUDGET_CATEGORIES, BUDGET_GROUPS, TRANSACTION_TYPES, TRANSACTION_STATUSES/SETTLED_TRANSACTION_STATUSES, roles, idiomas, formatos
   csv-export.ts                 ✅ exportar transacciones a CSV
-  date.ts                       ✅ todayISO, nextOccurrenceOfDay (día del mes → fecha real)
+  date.ts                       ✅ todayISO, nextOccurrenceOfDay, advanceDate (avanza next_payment_date según frequency)
   /supabase                    ✅ client.ts / server.ts / middleware.ts / admin.ts (service role, solo server)
   /providers/query-provider.tsx ✅ TanStack Query + persistencia IndexedDB
-  /hooks                       ✅ React Query hooks (uno por recurso + use-auth-user-id.ts), incluye use-commitments.ts / use-expected-income.ts
+  /hooks                       ✅ React Query hooks (uno por recurso + use-auth-user-id.ts), incluye use-commitments.ts / use-expected-income.ts / use-budget-templates.ts
   csv.ts                        ✅ Fase 1-B, parseo de CSV (papaparse)
 /types
   supabase.ts                  ✅ generado con `supabase gen types typescript --linked`
@@ -528,6 +586,8 @@ Pedido explícito del usuario: "refrescar el UI de la app, en desktop inicialmen
 De esas 4 se tomó **solo el lenguaje visual** (colores, tipografía, glass-panel/glow) para refrescar las pantallas reales (Dashboard, onboarding) — no se creó ninguna página nueva ni funcionalidad simulada a partir de ellas. Si esas fases arrancan en el futuro, ese mismo proyecto de Stitch sigue siendo la referencia de diseño a usar.
 
 **Alcance de esta pasada:** desktop (≥768px). El sidebar/topbar tienen un fallback mínimo para mobile (`MobileNav`, menú hamburguesa con los mismos links) para no dejarlo roto, pero no hubo una pasada de diseño responsive dedicada — queda pendiente si se prioriza.
+
+**⚠️ Bug real encontrado y corregido: el TopBar fijo tapaba los primeros ~40px de cada página, sin que nada lo advirtiera.** `app/(dashboard)/layout.tsx` tenía `<main className="... pt-16 p-4 md:p-6 ...">` — `pt-16` (64px, pensado para compensar la altura del TopBar `fixed`) y el shorthand `p-4`/`md:p-6` (padding en los 4 lados) compiten por la misma propiedad `padding-top`. Tailwind decide el ganador por el orden en que genera las reglas en el CSS final, **no** por el orden de las clases en el `className` — en este caso `md:p-6` ganaba, dejando `padding-top` real en 24px en vez de 64px. El resultado: cualquier botón ubicado en la primera fila de una página (ej. los nuevos "+ Agregar cuenta"/"+ Agregar tarjeta") quedaba geométricamente debajo del TopBar y era **imposible de clickear**, sin ningún error en consola — se detectó recién al intentar automatizar un click en el navegador y ver que el modal nunca se abría. Nunca se había notado antes porque ninguna página previa tenía un elemento clickeable tan arriba. Fix: separar `pt-16` (top) de `px-4 md:px-6 pb-4 md:pb-6` (el resto), nunca un `p-*` a secas junto a un `pt-*`/`pb-*`/etc. propio — mismo tipo de bug que la colisión de `max-w-sm` con tokens de spacing personalizados de una sesión anterior (ver el commit "Fix broken login container").
 
 ## No-funcionales
 

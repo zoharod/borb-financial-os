@@ -43,6 +43,38 @@ export const TRANSACTION_TYPES = [
 // Tipos que mueven plata entre dos cuentas propias (requieren cuenta destino).
 export const TRANSFER_LIKE_TYPES = ["transfer", "card_payment"] as const;
 
+// Ver architecture.md "Estados de transacción" — solo 'confirmed'/'reconciled'
+// cuentan en saldos y presupuesto vs. real; 'pending'/'scheduled' se ven en el
+// listado y en Flujo de Caja pero no mueven plata todavía; 'cancelled' queda
+// como registro histórico sin efecto en ningún cálculo.
+export const TRANSACTION_STATUSES = [
+  { value: "pending", label: "Pendiente" },
+  { value: "scheduled", label: "Programada" },
+  { value: "confirmed", label: "Confirmada" },
+  { value: "reconciled", label: "Conciliada" },
+  { value: "cancelled", label: "Cancelada" },
+] as const;
+
+// Estados que sí cuentan como plata real movida — usar en cualquier query que
+// calcule saldos, deuda de tarjeta o presupuesto vs. real.
+export const SETTLED_TRANSACTION_STATUSES = ["confirmed", "reconciled"] as const;
+
+// Grupos de presupuesto — ver categories.group_name (migración
+// 20260806163959). null = "Otros", no tiene grupo asignado todavía.
+export const BUDGET_GROUPS = [
+  { value: "vivienda", label: "Vivienda" },
+  { value: "transporte", label: "Transporte" },
+  { value: "salud", label: "Salud" },
+  { value: "comida", label: "Comida" },
+  { value: "suscripciones", label: "Suscripciones" },
+  { value: "personal", label: "Personal" },
+  { value: "inversiones", label: "Inversiones" },
+  { value: "deuda", label: "Deuda" },
+  { value: "ahorro", label: "Ahorro" },
+  { value: "extras", label: "Extras" },
+  { value: "fondos_anuales", label: "Fondos anuales" },
+] as const;
+
 export const CARD_NETWORKS = [
   { value: "visa", label: "Visa" },
   { value: "mastercard", label: "Mastercard" },
